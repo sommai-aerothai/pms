@@ -25,6 +25,7 @@ const REV_RE = /[\s_(\-]*Rev\.?\s*(\d+)\)?/i, CODE_PFX = /^(?:Ex)?(?:FM|WI|QP|QM
 const tidy = t => t.replace(/[_\s]+/g, ' ').replace(/^[\s\-–.:()]+|[\s\-–.:(]+$/g, '').trim();
 const extOf = f => (/\.([A-Za-z0-9]+)$/.exec(f || '') || [])[1]?.toLowerCase() || '';
 // หนังสือขออนุมัติใช้เอกสาร (ไม่ใช่ตัวฟอร์ม/WI): ชื่อไฟล์ขึ้นต้นปี พ.ศ. 4 หลัก + วส.บว · มี "ขออนุมัติ" · หรือเป็นฉบับลงนาม ผวส.บว → หมวดประกาศ/หนังสือ (ann)
+// ย้ายเป็นหนังสือเฉพาะ FM/WI · แผน/ตาราง PM เป็นหนังสือ วส.บว อยู่แล้ว ห้ามย้าย
 const isMemo = f => /^\d{4}\s*วส\.?บว|ขออนุมัติ|ผวส\.?บว/.test(String(f || '').split('/').pop());
 // ส่วนที่ติดมาจากชื่อไฟล์ (ใช้เฉพาะชื่อที่ได้จากไฟล์ · ชื่อจากฐานเชื่อตามนั้น): นามสกุลท้าย · รหัสซ้ำนำหน้า "04 FM-CESE-005" · คำเดี่ยวท้าย a/b/ok/edit
 const fromFile = t => tidy(tidy(t).replace(/\.[A-Za-z0-9]{2,4}$/, '').replace(new RegExp('^(?:\\d+\\s+)?' + CODE_PFX.source.slice(1), 'i'), '').replace(/\s+(?:[a-z]|ok|edit)$/, ''));   // ตัดเฉพาะ a/b/ok/edit ตัวเล็กท้ายชื่อไฟล์ · TX/RX ตัวใหญ่ = ความหมาย ห้ามตัด
@@ -37,7 +38,7 @@ const nameOf = (title, code, file) => {
 export const doc = r => {
   const file = pick(r.file, r.file_name, ''), code = r.code || '', raw = pick(r.title, r.name, ''), title = nameOf(raw, code, file) || (code ? '' : String(raw));
   const rev = r.rev || (REV_RE.exec(`${raw} ${file}`) || [])[1] || '';
-  return { ...r, schema: 1, id: String(pick(r.id, r.code, '')), code, rev, title, name: title, tag: r.tag || '', kind: r.kind, cat: isMemo(file) ? 'ann' : r.cat || catOf(r.kind), file,
+  return { ...r, schema: 1, id: String(pick(r.id, r.code, '')), code, rev, title, name: title, tag: r.tag || '', kind: r.kind, cat: isMemo(file) && /^(FM|WI)$/i.test(r.kind || '') ? 'ann' : r.cat || catOf(r.kind), file,
     sourceUrl: httpUrl(pick(r.sourceUrl, r.source_url)), storagePath: pick(r.storagePath, r.storage_path, null), bucket: 'docs', pages: pick(r.pages, null), size: pick(r.size, null), sha256: r.sha256 || '', fetchedAt: pick(r.fetchedAt, r.fetched_at, null), offline: r.offline ?? false };
 };
 // รวมไฟล์ชุดเดียวกัน (รหัส+ชื่อเดียวกัน) ที่มีทั้ง PDF และไฟล์แก้ได้ (doc/docx/xlsx) เป็นแถวเดียว: ดูด้วย PDF · ไฟล์แก้ได้เก็บที่ editable = { id, file, storagePath, bucket, size, sourceUrl }
