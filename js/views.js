@@ -4,6 +4,7 @@ import { impTarget, norm, roundOf } from './import-sarabun.js';
 import * as F from './flow.js';
 import { ORDER } from './data/schedule-2569.js';
 import { ATTACH_69 } from './data/wi-scope.js';
+import { DOC_GROUPS } from './shapes.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 export const ic = (n, c = '') => `<svg class="ic ${c}"><use href="./ui/icons.svg#i-${n}"/></svg>`;
@@ -17,7 +18,7 @@ const hhmm = iso => { const t = new Date(iso); return `${String((t.getUTCHours()
 export const { fiscal, txDone, bad, txDoneCount, formsDone } = F;
 
 // ---------- ชิ้นส่วนร่วม ----------
-const ST = { app: ['doc', ''], ok: ['done', ''], todo: ['circle', ''], warn: ['warn', 'w'], dl: ['dl', ''], cloud: ['cloud', ''] };
+const ST = { app: ['doc', ''], ok: ['done', ''], todo: ['circle', ''], warn: ['warn', 'w'], dl: ['dl', ''], cloud: ['cloud', ''], web: ['web', ''], sync: ['sync', ''] };
 const st = (k, text, c = '') => `<span class="st ${ST[k][1]} ${c}">${ic(ST[k][0])}${esc(text)}</span>`;
 const chev = ic('chev', 'ch');
 // ค้นหา = ปุ่มวงกลมแว่นขยายมุมขวาบน → ช่องขยายใน nav แบบ iOS + "ยกเลิก" (ไม่มีช่องค้นหาในเนื้อหา) · attr = data-filter="docs" ฯลฯ
@@ -45,7 +46,7 @@ const bkk = S => S.today;
 const DAYS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
 const ctxOf = S => ({ templates: S.templates, docs: S.docs, today: S.today });
 const sysName = (S, id) => (S.catalog.systems.find(s => s.id === id) || {}).name || id;
-const isMine = (S, d) => (d.performers || []).some(p => p === S.user.name || p === S.user.email);
+const isMine = (S, d) => (d.performers || []).some(p => p === S.user.name || p === S.user.email) || (!!d.owner && d.owner === S.user.id);   // ฐานจริง: examples.uploaded_by = ผู้ใช้
 export const recent = S => S.jobs.filter(j => j.status !== 'done').sort((a, b) => b.touched.localeCompare(a.touched))[0];
 
 // ---------- วันนี้: แถวต่อหนึ่งงาน = เมื่อไร · งานไหน · ติดอะไร + แคปซูลเดียวพาไปจุดที่ติด (ไม่มีความคืบหน้าซ้ำ) ----------
@@ -60,7 +61,7 @@ export function today(S) {
   const wd = DAYS[new Date(S.today + 'T00:00:00Z').getUTCDay()];
   return `${nav('วันนี้')}<div class="in today"><h1 class="lt">วันนี้</h1>
  <p class="sec note">สวัสดี ${esc(S.user.name)} · ${wd} ${dShort(S.today)}${store.backendName() === 'demo' ? ' · <span class="src">ข้อมูลจำลอง · วันสมมติ</span>' : ''}</p>
- ${rows.length ? `<div class="grp">${rows.join('')}</div>` : `<div class="grp"><div class="p16"><div class="big">ไม่มีงานที่ต้องทำตอนนี้</div><div class="sec">งานตามตารางที่ถึงรอบจะขึ้นที่นี่ · เลือกงานเองได้ที่แท็บ งาน PM</div></div></div>`}</div>`;
+ ${errCard(S, ['jobs'], 'งาน PM')}${rows.length ? `<div class="grp">${rows.join('')}</div>` : `<div class="grp"><div class="p16"><div class="big">ไม่มีงานที่ต้องทำตอนนี้</div><div class="sec">งานตามตารางที่ถึงรอบจะขึ้นที่นี่ · เลือกงานเองได้ที่แท็บ งาน PM</div></div></div>`}</div>`;
 }
 
 // ---------- รายงาน (ตัวอย่างของกอง) ----------
@@ -68,19 +69,27 @@ const RB = '#/docs/reports';
 const BADGE = '<span class="bdg">ตัวอย่าง</span>';
 const DOC_ST = { draft: ['todo', 'ร่าง'], review: ['todo', 'รอตรวจ'], accepted: ['ok', 'ผู้ตรวจรับแล้ว'] };
 const origin = d => d.origin === 'app' ? st('app', 'ที่ออกจากแอป') : BADGE;
-const docRow = (S, d, base) => swr(`<a class="row" href="${base}/doc/${d.id}"><span class="rt"><span>${esc(F.fmtTitle(d.title))}</span><span class="sub">${d.dates ? dRange(d.dates) + ' · ' : ''}${d.pages} หน้า · ผู้ปฏิบัติ ${d.crew} คน</span><span class="stl">${st(...DOC_ST[d.status])}${origin(d)}</span></span>${chev}</a>`, d.id, isOff(S, d.id));
+// ช่องที่ไม่รู้ (pages/crew/status = null จากฐานจริง) ไม่แสดง · ไม่เดาตัวเลข
+const docRow = (S, d, base) => swr(`<a class="row" href="${base}/doc/${esc(d.id)}"><span class="rt"><span>${esc(F.fmtTitle(d.title))}</span><span class="sub">${esc([d.dates ? dRange(d.dates) : d.round && 'ครั้งที่ ' + d.round, d.pages != null && d.pages + ' หน้า', d.crew != null && `ผู้ปฏิบัติ ${d.crew} คน`].filter(Boolean).join(' · '))}</span><span class="stl">${DOC_ST[d.status] ? st(...DOC_ST[d.status]) : ''}${origin(d)}</span></span>${chev}</a>`, d.id, isOff(S, d.id));
+// การ์ดโหลดไม่สำเร็จ (ต่อส่วน): ไอคอน+คำ · HTTP status · ลองใหม่ · รายละเอียด (path · status · ข้อความจากเซิร์ฟเวอร์) สำหรับวินิจฉัย
+const ERRW = { auth: 'ต้องเข้าสู่ระบบใหม่', offline: 'ออฟไลน์อยู่', notfound: 'ไม่พบข้อมูลที่ขอ', server: 'เซิร์ฟเวอร์ตอบผิดพลาด', throttled: 'ระบบยุ่ง ลองใหม่อีกครั้ง', invalid: 'ข้อมูลไม่ถูกต้อง' };
+const errBody = (e, retry) => `<div class="p16 errc">${st('warn', ERRW[e.code] || 'เกิดข้อผิดพลาด')}${e.status ? `<span class="sub">HTTP ${e.status}</span>` : ''}
+ <button class="btn sm alt" data-retry="${esc(retry)}">${ic('sync')}ลองใหม่</button></div>`;
+const errMore = L => `<details class="rel errd"><summary>${ic('info')}รายละเอียด</summary>${L.map(([k, e]) => `<p class="sec">${esc(k)}: ${esc([e.path, e.status, e.code, e.detail].filter(Boolean).join(' · '))}</p>`).join('')}</details>`;
+export const errCard = (S, keys, label) => { const L = keys.filter(k => S.err[k]).map(k => [k, S.err[k]]); if (!L.length) return '';
+  return `<div class="sh">โหลด${esc(label)}ไม่สำเร็จ</div><div class="grp">${errBody(L[0][1], L.map(x => x[0]).join(','))}</div><div class="pad2">${errMore(L)}</div>`; };
 export const isOff = (S, id) => { const t = S.files.find(x => x.id === id) || S.templates.find(x => x.code === id); return store.isOffline(id, t ? t.offline !== false : false); };
 const roundsList = (S, list, base) => list.length ? list.map(d => docRow(S, d, base)).join('') : '<div class="empty">ไม่มีรายงานในหมวดนี้</div>';
 const examples = S => S.docs.filter(d => !isMine(S, d));   // รายงานของฉันอยู่ที่ งาน PM › ย้อนหลัง เท่านั้น
 const stamp = iso => iso ? `${dFull(iso)} ${hhmm(iso)}` : 'ยังไม่มีข้อมูล';
 export function reports(S, _, back) {
-  const u = S.ui, c = S.catalog, pane = u.p || 'p-sys', sel = u.sel || 'tx-stby', ex = examples(S);
+  const u = S.ui, c = S.catalog, pane = u.p || 'p-sys', ex = examples(S), sel = u.sel || (c.systems.find(s => ex.some(d => d.system === s.id)) || c.systems[0] || {}).id;   // ระบบแรก (ตามลำดับ catalog) ที่มีรายงาน
   const yr = {}; c.systems.forEach(s => (s.years || []).forEach(y => yr[y.year] = (yr[y.year] || 0) + y.count));
   const row = (href, lead, t, v, x = '', sub = '') => `<a class="row ${x}" href="${href}">${lead}<span class="rt"><span>${esc(t)}</span>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</span><span class="rv">${v} รายงาน</span>${chev}</a>`;
   const list = ex.filter(d => d.system === sel), seg = (id, t, cur) => `<button data-pane="${id}" aria-pressed="${cur === id}">${t}</button>`;
   const head = `${nav('ตัวอย่างรายงานของกอง', back, '', 'ค้นหารายงาน')}<div class="in">${ptr}<h1 class="lt">ตัวอย่างรายงานของกอง</h1><p class="sec note">รายงานที่ผ่านมาของทั้งกอง ใช้เป็นตัวอย่างโครงฟอร์ม · ไม่ใช่ฉบับมาตรฐาน · รายงานของฉันอยู่ที่ งาน PM › ย้อนหลัง</p></div>`;
   if (S.wait.has('reports')) return `${head}<div class="in"><div class="pane">${skel(5)}</div></div>`;
-  return `${head}<div class="in"><div class="split"><div class="side">
+  return `${head}<div class="in">${errCard(S, ['docs', 'catalog'], 'ตัวอย่างรายงาน')}<div class="split"><div class="side">
  <div class="seg">${seg('p-sys', 'ระบบ', pane)}${seg('p-yr', 'ปี', pane)}</div>
  <div class="pane" id="p-sys" ${pane === 'p-sys' ? '' : 'hidden'}><div class="grp">${c.systems.map(s => row(`${RB}/${s.id}`, ic(s.icon, 'lead'), s.name, s.count, s.id === sel ? 'sel' : '', s.loc).replace('<a ', `<a data-sel="${s.id}" `)).join('')}</div></div>
  <div class="pane" id="p-yr" ${pane === 'p-yr' ? '' : 'hidden'}><div class="grp">${Object.keys(yr).sort((a, b) => b - a).map(y => row(`${RB}/by/yr/${y}`, '', y, yr[y])).join('')}</div></div></div>
@@ -89,30 +98,27 @@ export function reports(S, _, back) {
 
 // ---------- เอกสารเว็บกอง: 3 กลุ่ม → หมวด → ไฟล์ → ตัวดู ----------
 const fileRow = (S, f) => { const o = isOff(S, f.id);
-  return swr(`<a class="row" href="#/docs/k/${f.cat}/doc/${esc(f.id)}"><span class="rt"><span>${esc([f.code, f.title].filter(Boolean).join(' '))}</span><span class="sub">${[f.tag, f.rev && 'Rev.' + f.rev, 'ดึง ' + dShort(f.fetchedAt)].filter(Boolean).join(' · ')}</span>${o ? st('dl', 'ตั้งไว้ (ตัวอย่าง)') : st('cloud', 'ยังไม่ตั้ง')}</span>${chev}</a>`, f.id, o); };
+  return swr(`<a class="row" href="#/docs/k/${f.cat}/doc/${esc(f.id)}"><span class="rt"><span>${esc([f.code, f.title].filter(Boolean).join(' '))}</span><span class="sub">${[f.tag, f.rev && 'Rev.' + f.rev, f.fetchedAt && 'ดึง ' + dShort(f.fetchedAt)].filter(Boolean).join(' · ')}</span>${o ? st('dl', 'ตั้งไว้ (ตัวอย่าง)') : st('cloud', 'ยังไม่ตั้ง')}</span>${chev}</a>`, f.id, o); };
 export const searchAll = (S, q) => {
   const rs = examples(S).filter(d => `${d.title} ${sysName(S, d.system)} ${d.round}`.toLowerCase().includes(q)), fs = S.files.filter(f => `${f.code} ${f.title} ${f.tag}`.toLowerCase().includes(q));
   return !rs.length && !fs.length ? '<div class="empty">ไม่พบเอกสาร</div>'
     : (rs.length ? `<div class="sh">ตัวอย่างรายงานของกอง</div><div class="grp">${rs.map(d => docRow(S, d, RB)).join('')}</div>` : '') + (fs.length ? `<div class="sh">เอกสารจากเว็บกอง</div><div class="grp">${fs.map(f => fileRow(S, f)).join('')}</div>` : '');
 };
-// กลุ่มเอกสาร: [หัวข้อ, คำอธิบายไทย, [[หมวด|ลิงก์, ชื่อ, คำอธิบาย, ไอคอน]]]
-const DGROUPS = [
-  ['ใช้ทำงาน', 'ของที่เปิดใช้ระหว่างทำ PM ตั้งแต่เตรียมจนส่งรายงาน', [['fm', 'ฟอร์ม', 'แบบฟอร์มที่กรอกและแนบรายงาน (FM)', 'doc'], ['wi', 'WI', 'ขั้นตอนทำงานของอุปกรณ์แต่ละชนิด', 'book'], ['planpm', 'แผน PM', 'แผนบำรุงรักษาประจำปี', 'clip'], ['tablepm', 'ตาราง PM', 'ตารางงานรายเดือนตามหนังสือคำสั่ง', 'clip']]],
-  ['ระบบคุณภาพ', 'เอกสาร ISO 9001 ของกอง ที่ผู้ตรวจอ้างอิง', [['qm', 'QM', 'คู่มือคุณภาพ', 'book'], ['qp', 'QP', 'ระเบียบปฏิบัติ (เช่น QP-01 งาน PM)', 'book'], ['sd', 'SD', 'เอกสารระบบและแบบวงจร', 'book'], ['ann', 'ประกาศ/หนังสือ ISO', 'ประกาศและหนังสือที่เกี่ยวกับระบบคุณภาพ', 'doc']]],
-  ['อ้างอิง', 'เปิดดูเทียบเมื่อสงสัย ไม่ต้องกรอก', [['manual', 'คู่มืออุปกรณ์', 'คู่มือจากผู้ผลิต (Technical Manual)', 'book'], ['reports', 'ตัวอย่างรายงานของกอง', 'รายงาน PM ที่ผ่านมาของทั้งกอง', 'doc']]],
-];
 export function docs(S) {
-  const at = S.cats[0]?.rows[0]?.fetchedAt, cat = id => S.cats.find(c => c.id === id), nRep = examples(S).length;
+  const at = S.files.map(f => f.fetchedAt).filter(Boolean).sort().pop(), cat = id => S.cats.find(c => c.id === id), nRep = examples(S).length;
+  // หมวดที่ยังไม่มีในตาราง (ชนิดใหม่จากเว็บกอง) แสดงท้าย "อ้างอิง" ไม่ซ่อน
+  const known = new Set(DOC_GROUPS.flatMap(g => g[2].map(x => x[0]))), extra = S.cats.filter(c => !known.has(c.id)).map(c => [c.id, c.name, 'หมวดจากเว็บกอง', 'doc']);
+  const groups = DOC_GROUPS.map((g, i) => i === DOC_GROUPS.length - 1 ? [g[0], g[1], [...g[2], ...extra]] : g);
   const grp = ([t, ex, items]) => `<div class="sh">${t}</div><p class="gx">${ex}</p><div class="grp">${items.map(([id, name, sub, icon]) => { const c = cat(id), href = id === 'reports' ? RB : `#/docs/k/${id}`; if (id !== 'reports' && !c) return '';
     return `<a class="row" href="${href}">${ic(icon, 'lead')}<span class="rt"><span>${name}</span><span class="sub">${sub}</span></span><span class="rv">${id === 'reports' ? nRep + ' รายงาน' : c.total + ' ไฟล์'}</span>${chev}</a>`; }).join('')}</div>`;
   return `${nav('เอกสาร', null, '', 'ค้นหาเอกสาร (รหัสหรือชื่อ)', '="docs"')}<div class="in">${ptr}<h1 class="lt">เอกสาร</h1>
  <p class="sec note sync">${ic('sync')}เอกสารจากเว็บกอง · อัปเดตล่าสุด ${stamp(at)}</p>
- <div class="dhome" id="dhome">${S.wait.has('docs') ? skel(6) : DGROUPS.map(grp).join('')}</div><div id="dres" hidden></div></div>`;
+ <div class="dhome" id="dhome">${errCard(S, ['cats'], 'เอกสารเว็บกอง')}${errCard(S, ['docs'], 'ตัวอย่างรายงาน')}${S.wait.has('docs') ? skel(6) : groups.map(grp).join('')}</div><div id="dres" hidden></div></div>`;
 }
 export function kind(S, id, back) {
   const c = S.cats.find(x => x.id === id);
   return `${nav(c.name, back, '', 'ค้นหาในหมวดนี้')}<div class="in"><h1 class="lt">${esc(c.name)}</h1>
- <p class="sec note">แสดงตัวอย่าง ${c.rows.length} จาก ${c.total} ไฟล์ · โหมดตัวอย่าง</p><div class="grp">${c.rows.map(f => fileRow(S, f)).join('')}</div></div>`;
+ <p class="sec note">${store.backendName() === 'demo' ? `แสดงตัวอย่าง ${c.rows.length} จาก ${c.total} ไฟล์ · โหมดตัวอย่าง` : `${c.total} ไฟล์`}</p><div class="grp">${c.rows.map(f => fileRow(S, f)).join('')}</div></div>`;
 }
 export function years(S, sys, back) {
   const s = S.catalog.systems.find(x => x.id === sys) || {}, y = s.years || [];
@@ -125,12 +131,29 @@ export function rounds(S, arg, back) {
   const t = String(by ? val : y);
   return `${nav(t, back)}<div class="in"><h1 class="lt">${esc(t)}</h1><div class="grp">${roundsList(S, list, location.hash.split('/doc/')[0] || RB)}</div></div>`;
 }
+// ตัวดูไฟล์: storagePath = ไฟล์จริงจาก bucket ของชนิดข้อมูล (signed URL · app.js signView) · ไม่มีไฟล์ในระบบ = เปิดจากเว็บกอง (sourceUrl)
+// iPhone/iPad แสดง PDF ใน iframe ได้แค่หน้าแรก → แคปซูลเปิดแท็บใหม่แทน · ไม่รู้จำนวนหน้า = ไม่แสดงเลขหน้า
+export const viewItem = (S, id) => S.docs.find(x => x.id === id) || S.files.find(x => x.id === id) || S.templates.find(x => x.code === id);
+const isIOS = () => typeof navigator !== 'undefined' && (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform)));
+const WEB_NOTE = 'เปิดจากเว็บกอง (ต้องอยู่ในเน็ตบริษัท)';
+const extLink = (href, label, c = '') => `<a class="btn ${c}" href="${esc(href)}" target="_blank" rel="noopener">${ic('ext')}${label}</a>`;
+const openBtn = (S, id, it) => { const u = S.urls[id];
+  if (u && u.url) return extLink(u.url, 'เปิดไฟล์ต้นฉบับ');
+  if (it.sourceUrl) return `${extLink(it.sourceUrl, 'เปิดบนเว็บกอง')}<p class="sec note c">${WEB_NOTE}</p>`;
+  return `<button class="btn" data-toast="${it.storagePath ? 'กำลังเตรียมไฟล์ ลองอีกครั้ง' : 'ยังไม่มีไฟล์นี้ในระบบ'}">${ic('ext')}เปิดไฟล์ต้นฉบับ</button>`; };
 export function view(S, id, back) {
-  const d = S.docs.find(x => x.id === id), t = S.files.find(x => x.id === id) || S.templates.find(x => x.code === id);
-  const title = d ? F.fmtTitle(d.title) : [t.code, t.title || t.name, t.rev && 'Rev.' + t.rev].filter(Boolean).join(' '), pg = d ? d.pages : t.pages, code = d ? 'FM-CE.SE-006' : t.code || t.title;
-  const pages = Array.from({ length: Math.min(pg, 200) }, (_, i) => `<div class="page"><div class="hd"><i></i><span>${esc(code)}${i ? ` · แผ่นที่ ${i + 1}` : ''}</span></div><div class="ln"></div>${i ? '' : '<div class="ln s"></div>'}</div>`).join('');
-  return `${nav(title, back, `<button data-sheet="${d ? 'info' : 'src'}:${esc(id)}" aria-label="ข้อมูลรายงาน">${ic('info')}</button><button data-share aria-label="แชร์">${ic('share')}</button>`)}
- <div class="pages" data-pg="${pg}">${d && d.origin !== 'app' ? `<div class="vbd">${BADGE}</div>` : ''}${pages}<div class="pgbar">หน้า <span id="pn">1</span>/${pg}</div></div>`;
+  const d = S.docs.find(x => x.id === id), it = viewItem(S, id), u = S.urls[id] || {};
+  const title = d ? F.fmtTitle(d.title) : [it.code, it.title || it.name, it.rev && 'Rev.' + it.rev].filter(Boolean).join(' '), pg = it.pages, code = d ? 'FM-CE.SE-006' : it.code || it.title;
+  const fake = typeof pg === 'number' && pg > 0 ? Array.from({ length: Math.min(pg, 200) }, (_, i) => `<div class="page"><div class="hd"><i></i><span>${esc(code)}${i ? ` · แผ่นที่ ${i + 1}` : ''}</span></div><div class="ln"></div>${i ? '' : '<div class="ln s"></div>'}</div>`).join('') : '';
+  const badge = d && d.origin !== 'app' ? `<div class="vbd">${BADGE}</div>` : '';
+  let body;
+  if (it.storagePath) body = `<div class="in" data-vfile>${badge}${u.url ? (isIOS() ? `<div class="grp"><div class="p16">${st('app', 'ไฟล์พร้อมเปิด')}</div></div><div class="pad2">${extLink(u.url, 'เปิดไฟล์ในแท็บใหม่')}</div>`
+      : `<iframe class="vfile" src="${esc(u.url)}" title="${esc(title)}"></iframe><div class="pad2">${extLink(u.url, 'เปิดในแท็บใหม่', 'alt')}</div>`)
+    : u.err ? `<div class="grp">${errBody(u.err, 'file:' + id)}</div><div class="pad2">${errMore([['ไฟล์', u.err]])}</div>${it.sourceUrl ? `<div class="pad2">${extLink(it.sourceUrl, 'เปิดบนเว็บกอง', 'alt')}<p class="sec note c">${WEB_NOTE}</p></div>` : ''}`
+    : `<div class="grp"><div class="p16">${st('sync', 'กำลังเปิดไฟล์…')}</div></div>`}</div>`;
+  else if (it.sourceUrl) body = `<div class="in"><div class="grp"><div class="p16">${st('web', WEB_NOTE)}</div></div><div class="pad2">${extLink(it.sourceUrl, 'เปิดบนเว็บกอง')}</div></div>${fake ? `<div class="pages" data-pg="${pg}">${badge}${fake}<div class="pgbar">หน้า <span id="pn">1</span>/${pg}</div></div>` : ''}`;
+  else body = fake ? `<div class="pages" data-pg="${pg}">${badge}${fake}<div class="pgbar">หน้า <span id="pn">1</span>/${pg}</div></div>` : `<div class="in">${badge}<div class="empty">ยังไม่มีไฟล์นี้ในระบบ</div></div>`;
+  return `${nav(title, back, `<button data-sheet="${d ? 'info' : 'src'}:${esc(id)}" aria-label="${d ? 'ข้อมูลรายงาน' : 'ที่มาเอกสาร'}">${ic('info')}</button><button data-share aria-label="แชร์">${ic('share')}</button>`)}${body}`;
 }
 
 // ---------- งาน PM: ปัจจุบัน | ย้อนหลัง ----------
@@ -147,7 +170,7 @@ export function pm(S) {
   const next = F.scheduleGroups(S.sched, S.jobs.map(j => j.pm && j.pm.sched), S.today, me).slice(0, 2).flatMap(g => g[2].filter(r => r.people.includes(me)));
   const more = n => n > SCH_SHOW ? `<button class="row more" data-more>${ic('plus', 'lead')}<span class="rt"><span>ดูทั้งหมด ${n} งาน</span></span></button>` : '';
   const grp = (t, rows) => rows.length ? `<div class="sh">${t}</div><div class="grp">${rows.join('')}</div>` : '';
-  const cur = `${grp('ต้องทำ', todo.map(j => jobRow(j, S)))}${grp('รอผู้ตรวจ', wait)}
+  const cur = `${errCard(S, ['jobs', 'templates'], 'งาน PM')}${grp('ต้องทำ', todo.map(j => jobRow(j, S)))}${grp('รอผู้ตรวจ', wait)}
  ${next.length ? `<div class="sh">ถัดไป</div><div class="grp">${next.map((r, i) => i < SCH_SHOW ? schedRow(r, F.ymLabel(r.ym)) : schedRow(r, F.ymLabel(r.ym)).replace('<a ', '<a data-x hidden ')).join('')}${more(next.length)}</div>` : ''}
  ${!todo.length && !wait.length && !next.length ? '<div class="empty">ไม่มีงานค้าง · งานตามตารางของคุณที่ถึงรอบจะขึ้นที่นี่ · กด "+ งาน PM" เพื่อเลือกเอง</div>' : ''}`;
   const past = [...S.docs.filter(d => isMine(S, d) && d.status === 'accepted').map(d => [d.modified, docRow(S, d, '#/pm')]), ...my.filter(j => j.status === 'done').map(j => [j.touched, jobRow(j, S)])].sort((a, b) => b[0].localeCompare(a[0]));
@@ -393,7 +416,7 @@ export function sheet(S, kind, id) {
   }
   if (kind === 'example') {
     const j = S.job, cur = exampleOf(S, j), mineA = S.docs.filter(d => isMine(S, d) && d.status === 'accepted'), ex = examples(S);
-    const list = L => `<div class="grp" role="radiogroup" aria-label="ตัวอย่าง">${L.map(d => `<button class="row" role="radio" aria-checked="${cur && cur.id === d.id}" data-ex="${esc(d.id)}"><span class="rt"><span>${esc(F.fmtTitle(d.title))}</span><span class="sub">${d.dates ? dRange(d.dates) + ' · ' : ''}${d.pages} หน้า</span></span>${ic('ok', 'ck')}</button>`).join('')}</div>`;
+    const list = L => `<div class="grp" role="radiogroup" aria-label="ตัวอย่าง">${L.map(d => `<button class="row" role="radio" aria-checked="${cur && cur.id === d.id}" data-ex="${esc(d.id)}"><span class="rt"><span>${esc(F.fmtTitle(d.title))}</span><span class="sub">${esc([d.dates ? dRange(d.dates) : d.round && 'ครั้งที่ ' + d.round, d.pages != null && d.pages + ' หน้า'].filter(Boolean).join(' · '))}</span></span>${ic('ok', 'ck')}</button>`).join('')}</div>`;
     return h('เลือกตัวอย่างรายงาน', `${mineA.length ? `<div class="sh">ย้อนหลังของฉัน (ผู้ตรวจรับแล้ว)</div>${list(mineA)}` : ''}<div class="sh">ตัวอย่างรายงานของกอง</div>${list(ex)}`);
   }
   if (kind === 'file') {
@@ -420,15 +443,16 @@ export function sheet(S, kind, id) {
   }
   if (kind === 'wi') return h('WI-CE.SE-002 Rev.06 · ภาคผนวก ข', wiText.replace('<div class="p16"><div class="cap">ขั้นตอน', '<div class="p16"><div class="cap">ภาคผนวก ข · ขั้นตอน'));
   if (kind === 'info') {
-    const d = S.docs.find(x => x.id === id), o = isOff(S, id), s = S.catalog.systems.find(x => x.id === d.system);
-    return h('ข้อมูลรายงาน', `<div class="p16"><b>${esc(F.fmtTitle(d.title))}.pdf</b><div class="chips"><span>CE.SE</span>›<span>รายงาน PM</span>›<span>${esc(s.name)}</span>›<span>${d.year}</span>›<span>${d.round.replace('/', '-')}</span></div></div>
- <div class="grp"><div class="kv"><span>แก้ไขล่าสุด</span><span>${dFull(d.modified)} โดย ${esc(d.by)}</span></div><div class="kv"><span>ขนาด</span><span>${(d.size / 1e6).toFixed(1)} MB</span></div><div class="kv"><span>เก็บไว้ดู offline (ตัวอย่าง)</span>${sw(o, `data-off="${d.id}" aria-label="เก็บไว้ดู offline"`)}</div></div>
- <div class="pad2"><button class="btn" data-toast="โหมดตัวอย่าง · ยังไม่เชื่อมเซิร์ฟเวอร์กอง">${ic('ext')}เปิดไฟล์ต้นฉบับ</button></div>
+    const d = S.docs.find(x => x.id === id), o = isOff(S, id);
+    return h('ข้อมูลรายงาน', `<div class="p16"><b>${esc(F.fmtTitle(d.title))}.pdf</b><div class="chips"><span>CE.SE</span>›<span>รายงาน PM</span>›<span>${esc(sysName(S, d.system))}</span>${d.year ? `›<span>${d.year}</span>` : ''}${d.round ? `›<span>${esc(d.round.replace('/', '-'))}</span>` : ''}</div></div>
+ <div class="grp">${d.modified ? `<div class="kv"><span>แก้ไขล่าสุด</span><span>${dFull(d.modified)}${d.by ? ` โดย ${esc(d.by)}` : ''}</span></div>` : ''}${d.size ? `<div class="kv"><span>ขนาด</span><span>${(d.size / 1e6).toFixed(1)} MB</span></div>` : ''}<div class="kv"><span>เก็บไว้ดู offline (ตัวอย่าง)</span>${sw(o, `data-off="${esc(d.id)}" aria-label="เก็บไว้ดู offline"`)}</div></div>
+ <div class="pad2">${openBtn(S, id, d)}</div>
  <div class="pad2"><details class="rel"><summary>${ic('doc')}เอกสารที่เกี่ยวข้อง</summary><div class="kv"><span>หนังสือคำสั่งปฏิบัติงาน PM</span><span>PDF</span></div><div class="kv"><span>WI-CE.SE-002 Rev.06</span><span>WI</span></div></details></div>`);
   }
-  const t = S.files.find(x => x.id === id) || S.templates.find(x => x.code === id), o = isOff(S, id), u = new URL(t.sourceUrl), src = u.pathname.length > 30 ? u.host + '/…/' + decodeURIComponent(u.pathname.split('/').pop()) : u.host + u.pathname;
-  return h('ที่มาเอกสาร', `<div class="grp"><div class="kv"><span>ที่มา</span><span>${esc(src)}</span></div><div class="kv"><span>ดึงโดย</span><span>collector ${dShort(t.fetchedAt)}</span></div>
- <div class="kv"><span>เก็บไว้ดู offline (ตัวอย่าง)</span>${sw(o, `data-off="${id}" aria-label="เก็บไว้ดู offline"`)}</div></div><div class="pad2"><button class="btn" data-toast="โหมดตัวอย่าง · ยังไม่เปิดเว็บกอง">${ic('ext')}เปิดบนเว็บกอง</button></div>`);
+  const t = viewItem(S, id), o = isOff(S, id), u = t.sourceUrl ? new URL(t.sourceUrl) : null, last = u && u.pathname.split('/').pop();
+  let src = u ? u.host + u.pathname : 'ไม่มีลิงก์เว็บกอง'; if (u && u.pathname.length > 30) { try { src = u.host + '/…/' + decodeURIComponent(last); } catch { src = u.host + '/…/' + last; } }
+  return h('ที่มาเอกสาร', `<div class="grp"><div class="kv"><span>ที่มา</span><span>${esc(src)}</span></div>${t.fetchedAt ? `<div class="kv"><span>ดึงโดย</span><span>collector ${dShort(t.fetchedAt)}</span></div>` : ''}
+ <div class="kv"><span>เก็บไว้ดู offline (ตัวอย่าง)</span>${sw(o, `data-off="${esc(id)}" aria-label="เก็บไว้ดู offline"`)}</div></div><div class="pad2">${t.sourceUrl ? `${extLink(t.sourceUrl, 'เปิดบนเว็บกอง')}<p class="sec note c">${WEB_NOTE}</p>` : openBtn(S, id, t)}</div>`);
 }
 // CTA ลอยของหน้า: [act, icon, label, soft?, frac?] · soft = ยังไม่พร้อม (เทาอ่อนสุด + วงความคืบหน้า) แตะแล้วพาไปจุดที่ค้าง
 export const jobCta = (S, j) => j.status === 'done' ? null : F.isReady(j, ctxOf(S)) ? ['report', 'doc', 'สร้างรายงาน'] : ['gap', 'doc', 'สร้างรายงาน', true, F.jobProg(j).frac];

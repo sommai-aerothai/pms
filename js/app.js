@@ -11,11 +11,11 @@ import * as M from './motion.js';
 import { CONFIG } from './config.js';
 import * as imp from './import-sarabun.js';
 
-const VERSION = 'v0.8.0';
+const VERSION = 'v0.9.0';
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const app = $('#app'), TABS = ['today', 'pm', 'docs', 'me'];
 const TITLES = { today: 'วันนี้', pm: 'งาน PM', docs: 'เอกสาร', me: 'ฉัน' };
-const S = { ph: {}, rev: 0, ui: {}, wait: new Set(), seen: new Set(), version: VERSION, user: null, docs: [], templates: [], catalog: null, cats: [], files: [], jobs: [], job: null, sched: SCHEDULE, today: '', prev: {}, draft: null };
+const S = { ph: {}, rev: 0, ui: {}, wait: new Set(), seen: new Set(), version: VERSION, user: null, docs: [], templates: [], catalog: null, cats: [], files: [], jobs: [], job: null, err: {}, urls: {}, sched: SCHEDULE, today: '', prev: {}, draft: null };
 const pad = matchMedia(`(min-width:${tok('bp-pad')}px)`);
 let chain = [], tab = 'today', lastTab = null, lastHash = {}, saveT, toastT, tapFn = null, reveal = false;
 const RM = matchMedia('(prefers-reduced-motion: reduce)');
@@ -23,9 +23,16 @@ const nowIso = () => S.today + new Date().toISOString().slice(10);   // วั�
 const ctx = () => ({ templates: S.templates, docs: S.docs, today: S.today });
 
 // ---------- โหลดข้อมูล ----------
-async function load() {
-  [S.docs, S.templates, S.catalog, S.cats, S.jobs] = [(await store.listDocs()).items, await store.listTemplates(), await store.getCatalog(), await store.getFiles(), await store.listJobs()];
-  S.files = S.cats.flatMap(c => c.rows); S.job = V.recent(S) || S.jobs[0]; S.today = store.today();
+// แต่ละชุดโหลดแยกกัน (allSettled): ชุดไหนล้ม = เก็บ error ไว้ที่ S.err[ชื่อ] ให้หน้านั้นแสดงการ์ด "ลองใหม่" · ชุดอื่นยังวาด/แตะได้ตามปกติ
+const SETS = { docs: store.listReports, templates: store.listTemplates, catalog: store.getCatalog, cats: store.getFiles, jobs: store.listJobs };
+const EMPTY = { docs: [], templates: [], catalog: { schema: 1, systems: [] }, cats: [], jobs: [] };
+async function load(keys = Object.keys(SETS)) {
+  keys = keys.filter(k => SETS[k]);
+  if (saveT) save();   // บันทึกค่าค้างก่อน ไม่งั้นโหลดทับของเก่า
+  const cur = S.job && S.job.id, res = await Promise.allSettled(keys.map(k => SETS[k]()));
+  res.forEach((r, i) => { const k = keys[i]; if (r.status === 'fulfilled') { S[k] = r.value; delete S.err[k]; } else { S.err[k] = r.reason || {}; if (!S[k]) S[k] = EMPTY[k]; } });
+  S.files = S.cats.flatMap(c => c.rows); S.job = S.jobs.find(j => j.id === cur) || V.recent(S) || S.jobs[0]; S.today = store.today();
+  const dead = res.find(r => r.status === 'rejected' && r.reason && r.reason.code === 'auth'); if (dead) throw dead.reason;   // session หมดอายุ/ถูกปฏิเสธ = ล็อกอินใหม่
   await loadPhotos();
 }
 const photoIds = () => S.jobs.flatMap(j => [...(j.tx || []).flatMap(t => Object.values(t.photos)), ...j.tools.map(t => t.photo), ...(j.files || []).map(f => f.id)]).filter(Boolean);
@@ -33,9 +40,18 @@ async function loadPhotos() {
   for (const id of photoIds()) if (!S.ph[id]) { try { const b = await photos.get(id); if (b) S.ph[id] = URL.createObjectURL(b); } catch { /* IndexedDB ใช้ไม่ได้ → ไม่มี thumbnail */ } }
 }
 const errWord = e => ({ auth: 'ต้องเข้าสู่ระบบใหม่', server: 'เซิร์ฟเวอร์มีปัญหา ลองใหม่อีกครั้ง', conflict: 'มีคนแก้งานนี้ก่อน โหลดใหม่แล้วลองอีกครั้ง', offline: 'ออฟไลน์อยู่', invalid: 'ข้อมูลไม่ถูกต้อง', notfound: 'ไม่พบข้อมูล', throttled: 'ระบบยุ่ง ลองใหม่อีกครั้ง' }[e.code] || 'เกิดข้อผิดพลาด');
-async function refresh() {
-  try { [S.docs, S.templates, S.cats] = [(await store.listDocs()).items, await store.listTemplates(), await store.getFiles()]; S.files = S.cats.flatMap(c => c.rows); if (saveT) save();   /* บันทึกค่าค้างก่อน ไม่งั้นโหลดทับของเก่า */ const cur = S.job && S.job.id; S.jobs = await store.listJobs(); S.job = S.jobs.find(j => j.id === cur) || V.recent(S) || S.jobs[0]; S.today = store.today(); S.rev++; draw(); toast('รีเฟรชแล้ว', 'ok'); }
-  catch (e) { toast(errWord(e), 'warn'); }
+async function refresh(keys) {
+  try { await load(keys); S.rev++; draw(); const n = Object.keys(S.err).length; toast(n ? 'โหลดได้บางส่วน · ดูการ์ดในหน้า' : 'รีเฟรชแล้ว', n ? 'warn' : 'ok'); }
+  catch (e) { if (e.code === 'auth') { store.pref('user', null); app.classList.add('login'); } toast(errWord(e), 'warn'); }
+}
+// ตัวดูไฟล์: ขอ signed URL (bucket ตามชนิดข้อมูล) แล้วใส่ลง iframe/ลิงก์ของหน้าที่วาดแล้ว · เก็บไว้ใน S.urls ~9 นาที (URL อายุ 10 นาที)
+async function signView(el, id) {
+  const it = V.viewItem(S, id), u = S.urls[id]; if (!it || !it.storagePath) return;
+  if (u && (u.err || u.wait || u.exp > Date.now())) return;   // ล้มแล้ว = รอผู้ใช้กด "ลองใหม่" (ไม่วนขอซ้ำเอง) · กำลังขอ = ไม่ขอซ้ำ
+  S.urls[id] = { wait: true, exp: 0 };
+  try { const url = await store.fileUrl(it); if (!url) throw { code: 'notfound' }; S.urls[id] = { url, exp: Date.now() + 54e4 }; }
+  catch (e) { S.urls[id] = { err: e && e.code ? e : { code: 'server', detail: String((e && e.message) || e) }, exp: 0 }; }
+  const c = chain[chain.length - 1]; if (c.id === 's-view' && c.arg === id) { el.dataset.k = ''; paint(c, chain.length - 1); }   // ยังเปิดไฟล์นี้อยู่ = วาดตัวดูใหม่ด้วย URL/ข้อผิดพลาด
 }
 
 // ---------- router: hash → {tab, stack} ----------
@@ -89,6 +105,7 @@ function paint(c, i) {
   el.dataset.k = key; el.dataset.a = a; el.scrollTop = y; el.classList.toggle('sc', y > tok('collapse-y'));
   if (c.id === 's-fill') stripScroll(fresh, x);
   if (c.id === 's-sarabun') bmFill(el);
+  if (c.id === 's-view') signView(el, c.arg);
 }
 function draw() {
   const r = resolve(), changed = r.tab !== lastTab, from = lastTab; tab = r.tab; chain = r.chain;
@@ -310,12 +327,13 @@ function ctaGo() {
 
 // ---------- เหตุการณ์ ----------
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-spot],[data-vo],[data-ex],[data-sopen],[data-sx],[data-more],[data-site],[data-eng],[data-eng-other],[data-travel],[data-offrd],[data-use-imp],[data-open-draft],[data-sim040],[data-chk],[data-confirm-form],[data-form-done],[data-assign],[data-file-del],[data-val-edit],[data-val-save],[data-val-ok],[data-evt],#cta,[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],[data-impjob],[data-imp-save],[data-bm-link],[data-bm-copy],#bd');
+  const t = e.target.closest('[data-retry],[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-spot],[data-vo],[data-ex],[data-sopen],[data-sx],[data-more],[data-site],[data-eng],[data-eng-other],[data-travel],[data-offrd],[data-use-imp],[data-open-draft],[data-sim040],[data-chk],[data-confirm-form],[data-form-done],[data-assign],[data-file-del],[data-val-edit],[data-val-save],[data-val-ok],[data-evt],#cta,[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],[data-impjob],[data-imp-save],[data-bm-link],[data-bm-copy],#bd');
   if (!t) return; const d = t.dataset;
   if (d.pre) { const [k, v] = d.pre.split(':'); S.ui[k] = v; S.rev++; }
   if ('vo' in d) { S.ui.vo = !t.parentNode.open; return; }
   if (d.spot) S.ui.spot = d.spot;   // แตะแคปซูลในหน้าวันนี้ → ไปหน้างานแล้วเลื่อนไปจุดที่ติด
   if (t.id === 'cta') ctaGo();
+  else if ('retry' in d) { if (d.retry.startsWith('file:')) { delete S.urls[d.retry.slice(5)]; S.rev++; draw(); } else refresh(d.retry.split(',')); }   // การ์ดโหลดไม่สำเร็จ → โหลดเฉพาะชุดนั้นใหม่
   else if ('ex' in d) { S.job.example = d.ex; save(); closeSheet(); S.rev++; draw(); toast('เปลี่ยนตัวอย่างแล้ว', 'ok'); }
   else if ('sopen' in d) { const n = t.closest('.nav'); n.classList.add('so'); $('input', n).focus(); }
   else if ('sx' in d) { const n = t.closest('.nav'), i = $('input', n); n.classList.remove('so'); if (i.value) { i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); } }
@@ -398,7 +416,7 @@ let sa = 0;
 app.addEventListener('scroll', e => {
   const s = e.target.closest && e.target.closest('.screen'); if (!s) return;
   const y = e.target.scrollTop, d = y - (e.target._y || 0); e.target._y = y; s.classList.toggle('sc', y > tok('collapse-y'));
-  if (s.id === 's-view') $('#pn', s).textContent = Math.min(+$('.pages', s).dataset.pg, Math.floor(y / ($('.page', s).offsetHeight + 14) + .5) + 1);
+  if (s.id === 's-view' && $('.pages[data-pg]', s)) $('#pn', s).textContent = Math.min(+$('.pages', s).dataset.pg, Math.floor(y / ($('.page', s).offsetHeight + 14) + .5) + 1);
   if (!d) return; sa = sa * d > 0 ? sa + d : d; const mini = $('.tabbar').classList;
   // กฎเดียวทุกหน้า: dock ย่อได้เฉพาะหน้าที่เลื่อนได้เกิน --dock-min-scroll (หน้าสั้นไม่ย่อ)
   const long = e.target.scrollHeight - e.target.clientHeight > tok('dock-min-scroll');
@@ -425,7 +443,7 @@ async function finishLogin(recheck = false) {
         if (!recheck) { await a.signIn(em, pw); $('#pass').value = ''; $('#pass').type = 'password'; }   // ไม่ให้รหัสผ่านค้างในช่อง
         const p = await a.me(); $('#s-login').classList.toggle('wait', !p.approved);
         if (!p.approved) return;
-        u = { name: p.name || p.email, email: p.email }; await load();
+        u = { name: p.name || p.email, email: p.email, id: p.id }; S.user = u; await load();
       } catch (e) { $('#pass').value = ''; return loginErr(e.code === 'auth' ? LOGIN_ERR.auth : e.code === 'offline' ? LOGIN_ERR.offline : 'Something went wrong. Try again.'); }
     }
     enter(u);
@@ -483,6 +501,7 @@ initGestures({ app, hasTab: d => TABS[TABS.indexOf(tab) + d] !== undefined, goTa
 M.init(app);
 (async () => {
   const u = store.pref('user'); S.user = u || { name: 'สมหมาย' }; app.classList.toggle('login', !u);
+  if (u && real() && !u.id) { try { u.id = JSON.parse(localStorage.getItem('pms.session')).user.id; } catch {} }   // ผู้ใช้ที่ล็อกอินก่อนรุ่นนี้: เติม id จาก session (ใช้แยกรายงานของฉัน)
   let ok = false;   // ยังไม่มีข้อมูล (ยังไม่ล็อกอิน/โหลดไม่ได้) = ไม่วาดหน้าจอ ไม่งั้นพัง
   if (u || !real()) { try { await load(); ok = true; } catch (e) { if (e.code === 'auth') { store.pref('user', null); app.classList.add('login'); } toast(errWord(e), 'warn'); } }
   migrate(); if (ok) draw();
