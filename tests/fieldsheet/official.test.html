@@ -18,6 +18,7 @@ function drawForm(page) {
   X.forEach(x => line(x, H[3], x, yb));
   const T = (s, x, y, px = 3, a = 'center') => { g.font = `${px * K}px Arial`; g.textAlign = a; g.fillText(s, x * K, y * K); };
   T('FM-CE.SE-202', (L.docNo.x0 + L.docNo.x1) / 2, L.docNo.y1 - 2, 3.4); T('PM Tx Radio', 130, 24, 4); T('NO', (X[0] + X[1]) / 2, 64, 2.6); T('Freq.(MHz)', (X[1] + X[2]) / 2, 62, 2.4);
+  T('MaintID PM DM TX Radio Main ครั้งที่ 2/69', L.maintLine.x0 + 1, L.maintLine.y1 - 2, 3.6, 'left');
   const pg = L.pages[page];
   for (let r = 0; r < pg.n; r++) { const y = (L.rowEdges[r] + L.rowEdges[r + 1]) / 2 + 1; T(String(pg.tx0 + r), (X[0] + X[1]) / 2, y, 3); T((118 + (pg.tx0 + r) * 1.325).toFixed(3), (X[1] + X[2]) / 2, y, 3); T('PAE T6T', (X[4] + X[5]) / 2, y, 3); }
   return c;
@@ -38,7 +39,7 @@ function writeChars(g, rect, str, R) {   // str: อักขระ 0-9 . -  →
   }
 }
 const rand = n => Array.from({ length: n }, () => 0);
-let cN = 0, cOK = 0, cNull = 0, cWrong = 0, dN = 0, dOK = 0, regFail = 0, idOK = 0, idN = 0, empty = 0; const times = [], byField = {};
+let fN = 0, fOKc = 0, mOK = 0, cN = 0, cOK = 0, cNull = 0, cWrong = 0, dN = 0, dOK = 0, regFail = 0, idOK = 0, idN = 0, empty = 0; const times = [], byField = {};
 for (let seed = 1; seed <= SEEDS; seed++) for (const page of [1, 2]) {
   const R = rng(seed * 77 + page), base = drawForm(page), g = base.getContext('2d'), truth = {}, pg = L.pages[page];
   for (let r = 0; r < pg.n; r++) for (const f of L.fields) {
@@ -63,6 +64,7 @@ for (let seed = 1; seed <= SEEDS; seed++) for (const page of [1, 2]) {
   if (!res.ok) { regFail++; log(`p${page}/s${seed}: ${res.note}`); continue; }
   times.push(res.ms); log(`p${page}/s${seed}: จัดภาพ จับคู่ ${res.reg.matched}/${res.reg.of} (เส้น H${res.reg.hl}/V${res.reg.vl}) H[${res.reg.hk}] V[${res.reg.vk}] residual เฉลี่ย ${res.reg.resMean.toFixed(2)} สูงสุด ${res.reg.resMax.toFixed(2)} px`);
   if (res.meta.ident) { idN++; if (res.meta.ident.form === 'FM-202' && res.meta.ident.page === page) idOK++; else log(`  OCR ระบุ: ${JSON.stringify(res.meta.ident)}`); }
+  if (useOcr) { const want = (118 + 0) , fq = res.values.filter(v => /freq_mhz/.test(v.field)); fN += pg.n; fOKc += fq.filter(v => Math.abs(v.value - (118 + +v.field.match(/\[(\d+)\]/)[1] * 1.325)) < 0.0006).length; if (/Radio Main.*2\s*\/\s*69/.test(res.text)) mOK++; else log("  maint OCR: " + res.text); }
   const got = Object.fromEntries(res.values.map(v => [v.field, v]));
   for (const [key, t] of Object.entries(truth)) {
     const v = got[key], b = byField[t.f] ||= { n: 0, ok: 0 }; cN++; b.n++;
@@ -74,6 +76,7 @@ const ms = times.reduce((a, b) => a + b, 0) / (times.length || 1);
 log(`ช่องถูกทั้งค่า ${cOK}/${cN} = ${(100 * cOK / cN).toFixed(1)}% · null(ถามผู้ใช้) ${cNull} · ผิดแบบมั่นใจหรือหายไป ${cWrong} (หาย ${empty}) · จัดภาพไม่ได้ ${regFail} หน้า`);
 log(`ตัวเลขรายหลักถูก ${dOK}/${dN} = ${(100 * dOK / dN).toFixed(1)}%`);
 log('รายฟิลด์: ' + Object.entries(byField).map(([k, b]) => `${k} ${(100 * b.ok / b.n).toFixed(0)}%`).join(' · '));
+if (useOcr) log(`OCR ความถี่ตัวพิมพ์ถูก ${fOKc}/${fN} แถว · บรรทัด MaintID (รอบ 2/69) อ่านได้ ${mOK}/${idN} หน้า`);
 if (idN) log(`OCR ระบุฟอร์ม+หน้า ถูก ${idOK}/${idN}`);
 log(`เวลา/หน้า เฉลี่ย ${ms.toFixed(0)} ms`);
 document.title = 'DONE'; console.log('FS-DONE\n' + out.join('\n'));

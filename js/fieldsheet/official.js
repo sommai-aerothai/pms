@@ -141,6 +141,24 @@ export async function identifyByOcr(G, H, L) {
   return { form, head: head.trim(), nums: seen, page: votes[1] > votes[2] ? 1 : votes[2] > votes[1] ? 2 : null };
 }
 
+// อ่านตัวพิมพ์เพิ่ม: ความถี่ (คอลัมน์ Freq) ต่อแถว + บรรทัด MaintID (ชื่อสถานี/รอบ) ไว้จับคู่กับงาน
+export async function readPrinted(G, H, L, p) {
+  const { ocr } = await import('../readers/image.js'), pg = L.pages[p];
+  const blob = (x0, y0, x1, y1, k, pad) => {
+    const w = Math.round((x1 - x0) * k), h = Math.round((y1 - y0) * k), g = sampleRect(G, H, x0, y0, x1 - x0, y1 - y0, w, h);
+    const c = document.createElement('canvas'); c.width = w + 2 * pad; c.height = h + 2 * pad; const cx = c.getContext('2d'), im = cx.createImageData(w, h);
+    cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height); for (let i = 0; i < g.length; i++) im.data.set([g[i], g[i], g[i], 255], i * 4); cx.putImageData(im, pad, pad);
+    return new Promise(r => c.toBlob(r, 'image/png'));
+  };
+  const f = L.freqCol, m = L.maintLine, freqs = [];
+  for (let r = 0; r < pg.n; r++) {
+    const t = (await ocr(await blob(f.x0 + 0.4, L.rowEdges[r] + 0.4, f.x1 - 0.4, L.rowEdges[r + 1] - 0.4, 16, 40), 'eng')).text, v = /(\d{2,3})[.,](\d{1,3})/.exec(t);
+    freqs.push(v ? Math.round(parseFloat(v[1] + '.' + v[2]) * 1000) / 1000 : null);
+  }
+  const maint = (await ocr(await blob(m.x0, m.y0, m.x1, m.y1, 12, 20), 'eng')).text.replace(/\s+/g, ' ').trim();
+  return { freqs, maint };
+}
+
 export async function readOfficial(src, { page, ocr, layoutId = 'fm202-official', max = 2200 } = {}) {
   const t0 = performance.now(), L = await loadLayout(layoutId), id = await toImageData(src, max), G = toGray(id);
   const reg = register(G, L); if (!reg) return null;
@@ -160,5 +178,9 @@ export async function readOfficial(src, { page, ocr, layoutId = 'fm202-official'
     const a = assemble(cell.toks, f), no = pg.tx0 + r;
     values.push({ field: `tx[${no}].${f.id}`, value: a.value, unit: f.unit, locator: `official FM-202 p${p} r${r + 1} c${fi + 1}`, confidence: a.confidence, raw: a.raw, ...(globalThis.FS_DEBUG && { cell }), ...(a.note && { note: a.note }) });
   });
-  return { ok: true, meta, values, reg, ms: performance.now() - t0 };
+  let text = '';
+  if (ocr) {   // ความถี่ที่อ่านจากตัวพิมพ์ → ให้ฝั่งแอปจับคู่แถวกับงาน (ไม่ตรง = ไม่เติม) · แถวที่อ่านความถี่ไม่ได้ไม่ถูกเติม
+    try { const pr = await readPrinted(G, reg.H, L, p); text = 'A4: ' + pr.maint; pr.freqs.forEach((fq, r) => { if (fq != null) values.push({ field: `tx[${pg.tx0 + r}].freq_mhz`, value: fq, unit: 'MHz', locator: `official FM-202 p${p} r${r + 1} printed`, confidence: 'medium' }); }); } catch { /* ไม่มี OCR = ไม่มีความถี่ → ไม่เติม */ }
+  }
+  return { ok: true, meta, values, text, reg, ms: performance.now() - t0 };
 }

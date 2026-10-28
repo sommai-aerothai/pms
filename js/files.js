@@ -9,7 +9,7 @@ const MAP = { error_hz: 'err', osc_vdc: 'osc', power_w: 'pow', spurious_dbc: 'sp
 export function parse202(values, text = '') {
   const tx = {};
   for (const x of values) {
-    const m = /^tx\[(\d+)\]\.(\w+)$/.exec(x.field); if (!m) continue;
+    const m = /^tx\[(\d+)\]\.(\w+)$/.exec(x.field); if (!m || x.value == null) continue;   // value null = อ่านไม่มั่นใจ → ไม่เติม
     const t = (tx[m[1]] ||= { n: +m[1], freq: NaN, v: {} });
     if (m[2] === 'freq_mhz') t.freq = +x.value; else if (MAP[m[2]]) { let v = String(x.value); if (m[2] === 'spurious_dbc' && +v > 0) v = String(-v); t.v[MAP[m[2]]] = v; }
   }
@@ -38,12 +38,24 @@ export async function inspect(file, job, ctx) {
   const name = file.name || 'ไฟล์', byName = formCodeFrom(name);
   if (isVideo(file)) return { state: 'rejected', target: '', text: 'ไม่รับวิดีโอ · แนบรูปหรือเอกสารแทน' };
   let r;
-  try { r = await (await import('./readers/index.js')).readFile(file, ctx); } catch { return { state: 'error', target: byName, text: 'อ่านไฟล์ไม่ได้ · แนบไว้เฉย ๆ' }; }
+  try { r = await (ctx.reader || (await import('./readers/index.js')).readFile)(file, ctx); }   // ctx.reader = ช่องเสียบสำหรับทดสอบ
+  catch { return { state: 'error', target: byName, text: 'อ่านไฟล์ไม่ได้ · แนบไว้เฉย ๆ' }; }
   const code = r.target && r.target.form || byName, tpl = ctx.templates.find(t => t.code === code), rev = r.target && r.target.rev, rv = rev && tpl && tpl.rev !== rev ? ` · ไฟล์ Rev.${rev} ล่าสุด Rev.${tpl.rev}` : '';
   const note = String(r.note || '').replace(/^\S+\s/, '');   // ตัดอีโมจิหน้าข้อความของ reader
   if (/^⚠|^⛔/.test(r.note || '')) return { state: 'warn', target: code, text: note + ' · แนบไว้' };
   if (code === 'FM-CE.SE-202' && r.values.length) {
     const p = parse202(r.values, r.text); if (!p.rows.length) return { state: 'warn', target: code, text: 'พบ FM-202 แต่ไม่เจอแถวเครื่องส่ง · แนบไว้' };
+    let skip = 0;
+    if (r.subkind === 'fieldsheet') {   // ใบจดค่าหน้างาน: งานอ้างจาก QR (job id) · แถวอ้างจากเลขแถวบนใบ → แถวเครื่องส่งของงาน (ความถี่ของงานเอง)
+      if (r.sheet.job !== job.id) return { state: 'warn', target: code, text: `ใบจดค่านี้เป็นของงาน "${r.sheet.job}" ไม่ตรงกับงานนี้ · ไม่เติม` + rv };
+      if (!(job.tx || []).length) return { state: 'warn', target: code, text: 'งานนี้ยังไม่มีรายการเครื่องส่ง · ไม่เติม' };
+      p.rows = p.rows.filter(w => { const t = job.tx.find(x => x.n === w.n); if (t) w.freq = t.freq; else skip++; return !!t; });
+    } else if (r.subkind === 'official-handwriting') {   // ฟอร์มจริงไม่มี QR: ตรวจชื่อสถานี+รอบ แล้วจับคู่แถวด้วยความถี่ที่อ่านได้ (apply202 เทียบ n+freq) · ไม่ตรง = เว้นว่าง
+      if (!sameJob(p.maint, job)) return { state: 'warn', target: code, text: `ฟอร์มระบุ "${p.maint.replace(/^MaintID\s*/, '')}" ไม่ตรงกับงานนี้ · ไม่เติม` + rv };
+      p.rows = p.rows.filter(w => { const ok = (job.tx || []).some(x => x.n === w.n && x.freq === w.freq); if (!ok) skip++; return ok; });
+    }
+    if (r.subkind && !p.rows.length) return { state: 'warn', target: code, text: `ไม่มีแถวที่จับคู่กับงานนี้ได้${skip ? ` (ข้าม ${skip} แถว)` : ''} · แนบไว้` };
+    if (r.subkind) return { state: 'filled', target: code, text: `${p.rows.length} เครื่อง${skip ? ` · ข้าม ${skip} แถวที่ไม่ตรงกับงาน` : ''} · ค่าที่อ่านจากลายมือรอยืนยัน${rv}`, read: p, warnRev: !!rv, skipped: skip };
     if (!sameJob(p.maint, job)) return { state: 'warn', target: code, text: `ไฟล์ระบุ "${p.maint.replace(/^MaintID\s*/, '')}" ไม่ตรงกับงานนี้ · ไม่เติม` + rv };
     return { state: 'filled', target: code, text: `${p.rows.length} เครื่อง${rv}`, read: p, warnRev: !!rv };
   }
