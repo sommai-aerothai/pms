@@ -1,5 +1,6 @@
 // หน้าจอทั้งหมด = ฟังก์ชันรับ state คืน HTML (template literal) · ไม่มี framework
 import * as store from './store.js';
+import { impTarget } from './import-sarabun.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 export const ic = (n, c = '') => `<svg class="ic ${c}"><use href="./ui/icons.svg#i-${n}"/></svg>`;
@@ -222,11 +223,48 @@ export function me(S) {
   const r = (i, t, s) => `<button class="row" data-toast="โหมดตัวอย่าง · ยังไม่เปิดใช้">${ic(i, 'lead')}<span class="rt"><span>${t}</span><span class="sub">${s}</span></span>${chev}</button>`, auto = store.pref('auto') !== false;
   return `${nav('ฉัน')}<div class="in"><h1 class="lt">ฉัน</h1><div class="hero"><div class="avatar">${esc([...S.user.name][0])}</div><div class="big">${esc(S.user.name)}</div><div class="sec">${esc(S.user.email || 'CE.SE · AEROTHAI')}</div></div>
  <div class="grp">${r('ok', 'บัญชีบริษัท', store.backendName() === 'demo' ? 'โหมดตัวอย่าง · ยังไม่เชื่อมต่อ' : S.user.email || '')}${store.backendName() === 'demo' ? '' : `<button class="row" data-sheet="pw">${ic('lock', 'lead')}<span class="rt"><span>เปลี่ยนรหัสผ่าน</span></span>${chev}</button>`}${r('sig', 'ลายเซ็นของฉัน', 'ใช้ตอนออกรายงาน')}${r('gear', 'ตั้งค่า', 'แจ้งเตือนรอบ PM · calibration')}</div>
- <div class="sh">เชื่อมต่อ</div><div class="grp"><div class="kv"><span>เซิร์ฟเวอร์: ${store.backendName() === 'demo' ? 'ตัวอย่าง (demo)' : 'Supabase'}</span><button class="btn alt" data-be="${store.backendName() === 'demo' ? 'supabase' : 'demo'}">สลับเป็น ${store.backendName() === 'demo' ? 'Supabase' : 'demo'}</button></div></div>
+ <div class="sh">เชื่อมต่อ</div><div class="grp"><a class="row" href="#/me/sarabun">${ic('doc', 'lead')}<span class="rt"><span>เชื่อมสารบรรณ</span><span class="sub">ส่งบันทึกงานเข้า PMS ด้วยปุ่มใน Safari</span>${sarStat()}</span>${chev}</a><div class="kv"><span>เซิร์ฟเวอร์: ${store.backendName() === 'demo' ? 'ตัวอย่าง (demo)' : 'Supabase'}</span><button class="btn alt" data-be="${store.backendName() === 'demo' ? 'supabase' : 'demo'}">สลับเป็น ${store.backendName() === 'demo' ? 'Supabase' : 'demo'}</button></div></div>
  <div class="sh">พื้นที่ offline</div><div class="grp"><div class="kv"><span>ตั้งเก็บ offline อัตโนมัติ · ตัวอย่าง (ยังไม่โหลดไฟล์จริง)</span>${sw(auto, 'data-pref="auto" aria-label="ตั้งเก็บ offline อัตโนมัติ (ตัวอย่าง)"')}</div><div class="kv"><span>ตั้งไว้ในเครื่อง</span><span>${store.offlineCount()} รายการ</span></div></div>
  <div class="grp">${r('info', 'เกี่ยวกับ / เวอร์ชัน', `${S.version} (${store.backendName()})`)}</div>
  <div class="grp k"><button class="row red" data-signout>${ic('out')}ออกจากระบบ</button></div></div>`;
 }
+
+// ---------- นำเข้าจากสารบรรณ (ข้อมูลที่ bookmarklet ส่งมา = ข้อความไม่น่าเชื่อถือ → esc ทุกช่อง) ----------
+const sarStat = () => { const s = store.pref('sarabun'); return s && s.last ? st('ok', `ติดตั้งแล้ว · ใช้ล่าสุด ${dFull(s.last)}`) : st('todo', 'ยังไม่ติดตั้ง'); };
+const cut = (t, n) => { const a = [...t.replace(/\s+/g, ' ')]; return a.length > n ? a.slice(0, n).join('') + '…' : a.join(''); };
+function importScreen(S, _, back) {
+  const I = S.imp, head = `${nav('นำเข้าจากสารบรรณ', back)}<div class="in"><h1 class="lt">นำเข้าจากสารบรรณ</h1>`;
+  if (!I) return `${head}<div class="grp"><div class="p16"><div class="big">ยังไม่มีข้อมูลที่ส่งเข้ามา</div><div class="sec">เปิดหนังสือในสารบรรณ → พิมพ์บันทึกงาน → แตะปุ่ม "ส่งเข้า PMS"</div></div></div><div class="pad2"><a class="btn alt" href="#/me/sarabun">${ic('book')}วิธีติดตั้งปุ่ม</a></div></div>`;
+  const d = I.data, j = impTarget(S), kv = ([l, v]) => `<div class="kv"><span>${l}</span><span>${esc(v)}</span></div>`;
+  const rows = [['เลขทะเบียน', d.regNo], ['เลขที่เอกสาร', d.docNo], ['ลงวันที่', d.docDate], ['ประเภทเอกสาร', d.docType], ['สถานะ', d.status], ['จาก', d.from], ['ถึง', d.to], ['อ้างถึง', d.ref], ['เรื่อง', d.subject]].filter(r => r[1]);
+  const ents = d.entries.map(e => `<div class="row"><span class="rt"><span>${esc(e.unit || e.name)}</span><span class="sub">${esc(e.at)}${e.note ? ' · ' + esc(cut(e.note, 90)) : ''}</span></span></div>`).join('');
+  const m = j ? `<button class="row" data-sheet="impjob">${ic('clip', 'lead')}<span class="rt"><span>จับคู่กับงาน: ${esc(j.title)}</span><span class="sub">แตะเพื่อเปลี่ยน</span></span>${chev}</button>`
+    : `<button class="row" data-sheet="impjob">${ic('warn', 'lead w')}<span class="rt"><span>ยังไม่พบงานที่ตรงกับหัวเรื่อง</span><span class="sub">แตะเพื่อเลือกงานเอง</span></span>${chev}</button>`;
+  return `${head}<div class="grp"><div class="kv"><span>ที่มา</span>${st('app', 'สารบรรณ')}</div>${rows.map(kv).join('')}${I.pdfs.length ? kv(['ไฟล์ PDF', I.pdfs.length + ' ไฟล์']) : ''}</div>
+ ${d.entries.length ? `<div class="sh">บันทึกงาน ${d.entries.length} รายการ</div><div class="grp">${ents}</div>` : ''}
+ <div class="grp">${m}</div>
+ <div class="pad2">${j ? `<button class="btn" data-imp-save>${ic('ok')}บันทึกเข้างาน</button>` : `<button class="btn alt" data-sheet="impjob">${ic('clip')}เลือกงานเพื่อบันทึก</button>`}</div>
+ <p class="sec note c">บันทึกเฉพาะในเครื่องนี้ · ยังไม่ส่งขึ้นเซิร์ฟเวอร์</p></div>`;
+}
+// ติดตั้งปุ่ม: ลิงก์ลากได้ (href ใส่ตอนวาดเสร็จใน app.js) + คัดลอกโค้ด + ขั้นตอน iPhone/คอมพิวเตอร์
+const stp = (n, icon, title, sub, chip) => `<div class="stp"><span class="n">${n}</span><span class="rt"><span>${title}</span><span class="sub">${sub}</span>${chip ? `<span class="st mt1">${ic(icon)}${chip}</span>` : ''}</span></div>`;
+function sarabun(S, _, back) {
+  return `${nav('เชื่อมสารบรรณ', back)}<div class="in"><h1 class="lt">เชื่อมสารบรรณ</h1>
+ <div class="grp"><div class="row"><span class="rt"><span>ปุ่ม "ส่งเข้า PMS"</span>${sarStat()}</span></div></div>
+ <p class="sec note">แอปไม่เห็นรหัสผ่านสารบรรณของคุณ · ใช้การล็อกอินใน Safari ของคุณเอง (iPhone เติมรหัสด้วย Face ID ได้)</p>
+ <div class="pad2"><a class="btn" data-bm-link href="#/me/sarabun" draggable="true">${ic('book')}ส่งเข้า PMS</a><button class="btn alt" data-bm-copy>${ic('doc')}คัดลอกโค้ดปุ่ม</button></div>
+ <p class="sec note c">คอมพิวเตอร์: ลากปุ่มบนขึ้นแถบบุ๊กมาร์ก · iPhone: แตะ "คัดลอกโค้ดปุ่ม" แล้วทำตามขั้นตอนด้านล่าง</p>
+ <div class="seg" role="group" aria-label="อุปกรณ์"><button data-pane="bm-ph" aria-pressed="true">iPhone</button><button data-pane="bm-pc" aria-pressed="false">คอมพิวเตอร์</button></div>
+ <div class="pane" id="bm-ph"><div class="grp">
+  ${stp(1, 'share', 'คัดลอกโค้ด แล้วเพิ่มบุ๊กมาร์กใด ๆ', 'แตะ "คัดลอกโค้ดปุ่ม" ด้านบน · เปิดหน้าเว็บอะไรก็ได้ใน Safari · แตะแชร์ → เพิ่มบุ๊กมาร์ก → ตั้งชื่อ "ส่งเข้า PMS"', 'แชร์ › เพิ่มบุ๊กมาร์ก')}
+  ${stp(2, 'book', 'แก้ที่อยู่ของบุ๊กมาร์กเป็นโค้ดที่คัดลอก', 'Safari › บุ๊กมาร์ก › แก้ไข › แตะ "ส่งเข้า PMS" › ลบที่อยู่เดิมแล้ววางโค้ด › เสร็จ', 'บุ๊กมาร์ก › แก้ไข › วาง')}
+  ${stp(3, 'doc', 'ใช้งาน', 'ล็อกอินสารบรรณ → เปิดหนังสือ → "พิมพ์บันทึกงาน" → แตะแถบที่อยู่ เลือกบุ๊กมาร์ก "ส่งเข้า PMS" (หรือเปิดบุ๊กมาร์กแล้วแตะ)', 'พิมพ์บันทึกงาน › ส่งเข้า PMS')}</div></div>
+ <div class="pane" id="bm-pc" hidden><div class="grp">
+  ${stp(1, 'book', 'ลากปุ่ม "ส่งเข้า PMS" ขึ้นแถบบุ๊กมาร์ก', 'ถ้าไม่เห็นแถบ: Chrome/Edge กด Ctrl+Shift+B · Safari กด ⌘⇧B', 'ลาก › แถบบุ๊กมาร์ก')}
+  ${stp(2, 'doc', 'เปิดหนังสือในสารบรรณ', 'ล็อกอินด้วยบัญชีของคุณ → เปิดหนังสือ → "พิมพ์บันทึกงาน"', 'พิมพ์บันทึกงาน')}
+  ${stp(3, 'ok', 'คลิกบุ๊กมาร์ก "ส่งเข้า PMS"', 'หน้าต่างแอปเปิดพร้อมข้อมูล · ตรวจแล้วกด "บันทึกเข้างาน"', 'ส่งเข้า PMS › บันทึกเข้างาน')}</div></div></div>`;
+}
+export { importScreen as import, sarabun };
 
 // ---------- sheet ----------
 const frame = (t, body) => `<i class="grab"></i><div class="sh-h"><span>${t}</span><button data-close>เสร็จ</button></div>${body}`;
@@ -234,6 +272,10 @@ const frame = (t, body) => `<i class="grab"></i><div class="sh-h"><span>${t}</sp
 export const actSheet = (title, a) => frame(esc(title), `<div class="grp"><button class="row" ${[...a.attributes].filter(x => x.name.startsWith('data-')).map(x => `${x.name}="${esc(x.value)}"`).join(' ')}>${a.querySelector('svg').outerHTML.replace('class="ic ', 'class="ic lead ')}<span class="rt"><span>${esc(a.textContent)}</span></span></button></div>`);
 export function sheet(S, kind, id) {
   const h = frame;
+  if (kind === 'impjob') {
+    const cur = impTarget(S);
+    return h('เลือกงาน', `<div class="grp" role="radiogroup" aria-label="งาน">${S.jobs.map(x => `<button class="row" role="radio" aria-checked="${cur === x}" data-impjob="${esc(x.id)}"><span class="rt"><span>${esc(x.title)}</span><span class="sub">${dRange(x.dates)}</span></span>${ic('ok', 'ck')}</button>`).join('')}</div>`);
+  }
   if (kind === 'new') {
     const t = bkk(), r0 = fiscal(t).round, e = new Date(Date.parse(t) + 2 * 864e5).toISOString().slice(0, 10);
     return h('เริ่มงานใหม่', `<div class="sh">ระบบ</div><div class="grp" role="radiogroup" aria-label="ระบบ">${S.catalog.systems.map(x => `<button class="row" role="radio" aria-checked="false" data-sys="${x.id}"><span class="rt"><span>${esc(x.name)}</span>${x.loc ? `<span class="sub">${esc(x.loc)}</span>` : ''}</span>${ic('ok', 'ck')}</button>`).join('')}</div>
@@ -254,7 +296,7 @@ export function sheet(S, kind, id) {
     const j = S.job, [a, b] = id.split('.'), pid = a === 'folder' ? j.folder.photos[+b].id : a === 'tool' ? j.tools[+b].photo : j.tx[a - 1].photos[b], p = a === 'folder' ? j.folder.photos[+b] : {}, u = S.ph[pid];
     const isImg = !p.type || p.type.startsWith('image/');
     return h('รูป', `${u && isImg ? `<img class="ph-view" src="${u}" alt="">` : `<div class="p16"><b>${esc(p.name || 'ไฟล์')}</b><div class="sec">${esc(p.type || '')}</div></div>`}
- <div class="pad2">${a === 'folder' ? '' : `<button class="btn alt" data-cam="${id}">${ic('cam')}ถ่ายใหม่</button>`}<button class="btn alt" data-photo-del="${id}">${ic('trash')}ลบรูป</button></div>`);
+ <div class="pad2">${u && !isImg ? `<a class="btn" href="${u}" target="_blank" rel="noopener">${ic('ext')}เปิดไฟล์</a>` : ''}${a === 'folder' ? '' : `<button class="btn alt" data-cam="${id}">${ic('cam')}ถ่ายใหม่</button>`}<button class="btn alt" data-photo-del="${id}">${ic('trash')}ลบรูป</button></div>`);
   }
   if (kind === 'wi') return h('WI-CE.SE-02 Rev.06 · หน้า 50', wiText.replace('<div class="p16"><div class="cap">ขั้นตอน', '<div class="p16"><div class="cap">ภาคผนวก ข · ขั้นตอน'));
   if (kind === 'info') {

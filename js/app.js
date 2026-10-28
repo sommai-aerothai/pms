@@ -6,8 +6,9 @@ import * as photos from './photos.js';
 import { tok } from './tok.js';
 import * as M from './motion.js';
 import { CONFIG } from './config.js';
+import * as imp from './import-sarabun.js';
 
-const VERSION = 'v0.6';
+const VERSION = 'v0.7';
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const app = $('#app'), TABS = ['today', 'pm', 'docs', 'me'];
 const TITLES = { today: 'วันนี้', pm: 'งาน PM', docs: 'เอกสาร', me: 'ฉัน' };
@@ -34,7 +35,9 @@ async function refresh() {
 // ---------- router: hash → {tab, stack} ----------
 const parts = () => decodeURIComponent(location.hash).replace(/^#\/?/, '').split('/').filter(Boolean);
 function resolve() {
-  let p = parts(); if (!TABS.includes(p[0])) p = ['today'];
+  let p = parts();
+  if (p[0] === 'import') return { tab: 'me', chain: [{ id: 's-me', title: TITLES.me }, { id: 's-import', title: 'นำเข้าจากสารบรรณ' }] };   // ปลายทางของบุ๊กมาร์กเล็ต สารบรรณ
+  if (!TABS.includes(p[0])) p = ['today'];
   const t = p[0]; let rest = p.slice(1), doc = null;
   const di = rest.indexOf('doc'); if (di > -1) { doc = rest[di + 1]; rest = rest.slice(0, di); }
   const st = [], sysName = id => (S.catalog.systems.find(s => s.id === id) || {}).name || id;
@@ -44,6 +47,8 @@ function resolve() {
     else if (r[0]) { st.push({ id: 's-years', arg: r[0], title: sysName(r[0]) }); if (r[1]) st.push({ id: 's-rounds', arg: [r[0], r[1]], title: r[1] }); }
   } else if (t === 'docs') {
     const c = rest[0] === 'k' && S.cats.find(x => x.id === rest[1]); if (c) st.push({ id: 's-kind', arg: c.id, title: c.name });
+  } else if (t === 'me') {
+    if (rest[0] === 'sarabun') st.push({ id: 's-sarabun', title: 'เชื่อมสารบรรณ' });
   } else if (t === 'pm') {
     const j = S.jobs.find(x => x.id === rest[0]);
     if (j) {
@@ -64,6 +69,7 @@ function paint(c, i) {
   el.innerHTML = V[c.id.slice(2)](S, c.arg, i ? chain[i - 1].title : null);
   el.dataset.k = key; el.dataset.a = a; el.scrollTop = y; el.classList.toggle('sc', y > tok('collapse-y'));
   if (c.id === 's-fill') stripScroll(fresh, x);
+  if (c.id === 's-sarabun') bmFill(el);
 }
 function draw() {
   const r = resolve(), changed = r.tab !== lastTab, from = lastTab; tab = r.tab; chain = r.chain;
@@ -80,7 +86,7 @@ function draw() {
   $('.tabbar').classList.remove('mini'); drawCta();
   if (changed) { if (from) M.tabSwitch($('#s-' + from), $('#s-' + tab), Math.sign(TABS.indexOf(tab) - TABS.indexOf(from))); app.offsetWidth; app.classList.remove('nq'); }
   M.sync(); S.ui.added = null;
-  lastTab = tab; lastHash[tab] = location.hash.split('/doc/')[0];
+  lastTab = tab; if (!location.hash.startsWith('#/import')) lastHash[tab] = location.hash.split('/doc/')[0];
 }
 // ลิงก์เก่า: #/home → #/today · #/man → #/docs/k/fm · #/reports/… และ #/docs/<ระบบ…> (รายงาน) → #/docs/reports/… · #/pm/fill → #/pm/<งานเดิม>/fill · #/me อยู่เหมือนเดิม
 function migrate() {
@@ -96,6 +102,7 @@ const go = h => { location.hash = h; };
 function pop() {
   if (document.activeElement) document.activeElement.blur();
   const p = parts(), di = p.indexOf('doc');
+  if (p[0] === 'import') return go('#/me');
   go('#/' + (di > -1 ? p.slice(0, di) : p[2] === 'by' ? p.slice(0, 2) : p.slice(0, -1)).join('/'));
 }
 
@@ -228,7 +235,7 @@ function ctaGo() {
 
 // ---------- เหตุการณ์ ----------
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-start],[data-sys],[data-job-act],[data-rd],[data-web],#cta,[data-create],[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],#bd');
+  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-start],[data-sys],[data-job-act],[data-rd],[data-web],#cta,[data-create],[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],[data-impjob],[data-imp-save],[data-bm-link],[data-bm-copy],#bd');
   if (!t) return; const d = t.dataset;
   if (d.pre) { const [k, v] = d.pre.split(':'); if (k === 'cur') { const jb = S.jobs.find(x => x.id === d.pre.split(':')[2]); if (jb) { jb.cur = +v; if (jb === S.job) sched(); else store.putJob(jb); } } else S.ui[k] = v; S.rev++; }
   if (t.id === 'cta') ctaGo();
@@ -260,6 +267,10 @@ document.addEventListener('click', e => {
   else if ('done' in d) document.activeElement.blur();
   else if ('signout' in d) { store.signOut().then(() => { history.replaceState(null, '', location.pathname); location.reload(); }); }
   else if ('share' in d) { const u = location.href; navigator.share ? navigator.share({ url: u }).catch(() => {}) : toast('แชร์ยังไม่เปิดใช้ในเบราว์เซอร์นี้'); }
+  else if (d.impjob) { S.imp.pick = d.impjob; closeSheet(); S.rev++; draw(); }
+  else if ('impSave' in d) saveImport();
+  else if ('bmLink' in d) { e.preventDefault(); toast('ลากปุ่มนี้ขึ้นแถบบุ๊กมาร์ก ไม่ต้องแตะ', 'info', null, 3000); }
+  else if ('bmCopy' in d) copyBm();
   else if (d.sel && pad.matches) { e.preventDefault(); S.ui.sel = d.sel; S.rev++; draw(); }
 });
 document.addEventListener('input', e => {
@@ -339,6 +350,33 @@ async function savePassword() {
   try { await store.auth().changePassword(a); } catch (e) { return say(e.code === 'invalid' ? 'รหัสผ่านนี้ใช้ไม่ได้ ลองตั้งใหม่' : errWord(e)); }
   closeSheet(); toast('เปลี่ยนรหัสผ่านแล้ว', 'ok');
 }
+
+// ---------- สารบรรณ: ติดตั้งปุ่ม + รับข้อมูลที่นำเข้า ----------
+// โค้ดปุ่มอ่านจาก bookmarklet/sarabun-to-pms.js (ไฟล์เดียวเป็นต้นฉบับ) ย่อ+ใส่ที่อยู่แอปที่เปิดอยู่ (/pms/ หรือ /pms/preview/)
+let bmCode = '', bmSrc = null;
+function bmFill(el) {
+  bmSrc ||= fetch('./bookmarklet/sarabun-to-pms.js').then(r => r.ok ? r.text() : Promise.reject());
+  bmSrc.then(src => { bmCode = imp.bookmarklet(src, new URL('./', location.href).href); const a = $('[data-bm-link]', el); if (a) a.href = 'javascript:' + encodeURIComponent(bmCode.slice(11)); }).catch(() => { bmSrc = null; });
+}
+async function copyBm() {
+  if (!bmCode) return toast('กำลังเตรียมโค้ด ลองกดอีกครั้ง', 'sync');
+  try { await navigator.clipboard.writeText(bmCode); toast('คัดลอกโค้ดแล้ว', 'ok'); }
+  catch { toast('คัดลอกไม่ได้ ลองใหม่อีกครั้ง', 'warn'); }
+}
+async function saveImport() {
+  const I = S.imp, j = I && imp.impTarget(S); if (!j) return toast('เลือกงานก่อน', 'warn');
+  const files = [];
+  try { for (const p of I.pdfs) files.push({ name: p.name, type: 'application/pdf', id: await photos.put(p.blob) }); }
+  catch { toast('เก็บไฟล์ PDF ไม่ได้ (พื้นที่เต็มหรือถูกปิดไว้)', 'warn'); }
+  const n = imp.applyImport(j, I.data, new Date().toISOString());
+  n.folder = { ...n.folder, photos: [...((n.folder || {}).photos || []), ...files] };
+  if (!store.putJob(n)) { files.forEach(f => photos.del(f.id).catch(() => {})); return toast('พื้นที่เก็บเต็ม — บันทึกไม่ได้', 'warn', null, 3500); }
+  Object.assign(j, n); S.job = j; S.imp = null; imp.unstash(); await loadPhotos(); S.rev++; go('#/pm/' + j.id); toast('นำเข้าบันทึกงานแล้ว', 'ok');
+}
+imp.init(v => {
+  S.imp = { ...v, pick: null }; store.pref('sarabun', { last: new Date().toISOString() }); S.rev++;
+  if (S.catalog && !app.classList.contains('login')) location.hash === '#/import' ? draw() : go('#/import');   // ยังโหลดไม่เสร็จ/ยังไม่ล็อกอิน: เก็บไว้ก่อน วาดตอนเริ่ม
+}, () => toast('ข้อมูลจากสารบรรณไม่ถูกต้อง · ลองกดปุ่มอีกครั้ง', 'warn', null, 3500));
 
 // ---------- เริ่มทำงาน ----------
 function themeColor() { $('meta[name=theme-color]').content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(); }

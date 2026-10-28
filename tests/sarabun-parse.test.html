@@ -1,0 +1,101 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>ทดสอบ parser สารบรรณ</title>
+<!-- รันตัวอย่าง: python3 -m http.server -d app → เปิด /tests/sarabun-parse.test.html (ต้องผ่าน http ไม่ใช่ file://) · ผลอยู่ใน #out และ title = "DONE ผ่าน/ทั้งหมด" -->
+<pre id="out"></pre>
+<iframe id="fx" src="sarabun-fixture.html" style="width:900px;height:600px"></iframe>
+<script type="module">
+const out = document.getElementById('out'); let pass = 0, total = 0;
+const ok = (c, name) => { total++; if (c) pass++; out.textContent += `${c ? 'PASS' : 'FAIL'}  ${name}\n`; };
+const eq = (a, b, name) => ok(JSON.stringify(a) === JSON.stringify(b), `${name}${JSON.stringify(a) === JSON.stringify(b) ? '' : ` (ได้ ${JSON.stringify(a)} ต้องการ ${JSON.stringify(b)})`}`);
+const fx = document.getElementById('fx');
+await new Promise(r => (fx.contentDocument.body || {}).textContent?.includes('รายงานการบันทึกงาน') ? r() : fx.addEventListener('load', r, { once: true }));   // ระวัง: iframe เริ่มเป็น about:blank ที่ 'complete' อยู่แล้ว
+const src = await (await fetch('../bookmarklet/sarabun-to-pms.js')).text();
+fx.contentWindow.__pmsTest = {};
+const sc = fx.contentDocument.createElement('script'); sc.textContent = src; fx.contentDocument.head.append(sc);
+const parse = fx.contentWindow.__pmsTest.parse;
+const imp = await import('../js/import-sarabun.js');
+
+// ---- parser บนหน้าตัวอย่าง (sanitised) ----
+const d = parse(fx.contentDocument, 'https://sarabun.example/printactionmsg.aspx?wid=test13%2f2569&bid=null&curregno=595&secret=abc');
+ok(d, 'parse คืนค่า');
+eq([d.schema, d.source], [1, 'sarabun'], 'schema/source');
+eq(d.regNo, '595', 'regNo');
+eq(d.docNo, 'วส.บว-ทดสอบ13/2569', 'docNo');
+eq(d.docType, 'เอกสารส่งภายใน', 'docType');
+eq(d.status, 'เสร็จแล้ว', 'status');
+eq([d.docDate, d.docDateISO], ['06/08/2569', '2026-08-06'], 'docDate + ISO (พ.ศ.→ค.ศ.)');
+eq([d.printedAt, d.printedAtISO], ['24/10/2569', '2026-10-24'], 'printedAt + ISO');
+eq([d.ref, d.from, d.to], ['', 'วส.บว.ชื่อ ทดสอบ', 'ผคจ.ศก. ผ่าน ผวส.บว.'], 'ref ว่าง · from · to');
+ok(d.subject.includes('ครั้งที่') && d.subject.includes('๒/๒๕๖๙'), 'subject มี "ครั้งที่" และเลขไทยเดิม');
+eq(d.entries.length, 3, 'entries 3 รายการ');
+eq([d.entries[0].at, d.entries[0].atISO], ['06/08/2569 08:46:18', '2026-08-06T08:46:18+07:00'], 'entry[0].at + ISO');
+eq([d.entries[0].unit, d.entries[0].name], ['วส.บว.ชื่อ ทดสอบ', 'ชื่อ ทดสอบ'], 'entry[0] unit/name');
+eq(d.entries[0].presenter, 'เรียน ผวส.บว.', 'entry[0].presenter');
+ok(d.entries[0].note.startsWith('ขอแจ้งการซ่อมบำรุง') && d.entries[0].note.endsWith('จึงเรียนมาเพื่อโปรดทราบ') && d.entries[0].note.includes('\n'), 'entry[0].note หลายบรรทัด');
+eq(d.entries[0].remark, '', 'entry[0].remark ว่าง (ไม่กลืนลายเซ็น)');
+ok(d.entries[1].note.includes('ไม่มีผลกระทบต่อการให้บริการ') && d.entries[1].note.includes('ผวส.บว.'), 'entry[1].note ครบถึงท้าย');
+eq(d.entries[1].unit, 'วส.บว. กองวิศวกรรมระบบสื่อสารการเดินอากาศ', 'entry[1].unit');
+eq(d.entries[2].note, 'รับทราบครับ', 'entry[2].note');
+eq(d.entries[2].at, '11/08/2569 06:17:51', 'entry[2].at');
+eq(d.url, 'https://sarabun.example/printactionmsg.aspx?wid=test13%2F2569&bid=&curregno=595&secret=', 'url: คงค่าเฉพาะ wid/curregno · ค่าอื่นเหลือแค่ชื่อ');
+eq(d.pdfLinks.length, 1, 'pdfLinks 1 ลิงก์');
+ok(/^http.*\/tests\/files\/attach-test\.pdf$/.test(d.pdfLinks[0]), 'pdfLinks เป็น URL เต็ม .pdf');
+eq(parse(new DOMParser().parseFromString('<body><p>หน้าอื่น</p></body>', 'text/html'), 'https://x.test/a.aspx'), null, 'หน้าที่ไม่ใช่ worklog → null');
+
+// ---- บุ๊กมาร์กเล็ตย่อแล้วยังเป็น JS ที่ถูกต้อง บรรทัดเดียว ไม่มี # % ----
+const one = imp.bookmarklet(src, 'https://x.test/pms/preview/');
+ok(one.startsWith('javascript:') && !one.includes('\n'), 'bookmarklet บรรทัดเดียว');
+ok(!/[#%]/.test(one.slice(11)), 'bookmarklet ไม่มี # หรือ %');
+ok(one.includes("'https://x.test/pms/preview/'") && !one.includes('sommai-aerothai'), 'bookmarklet ใส่ที่อยู่แอปที่เปิดอยู่');
+let syntaxOk = true; try { new Function(one.slice(11)); } catch (e) { syntaxOk = false; out.textContent += String(e) + '\n'; }
+ok(syntaxOk, 'bookmarklet ย่อแล้ว syntax ถูก');
+
+// ---- validate (จุดตรวจความปลอดภัยของแอป) ----
+const msg = (over = {}) => ({ type: 'pms-import', data: { ...structuredClone(d), ...over }, pdfs: [] });
+const good = imp.validate(msg());
+ok(good && good.data.regNo === '595' && good.data.entries.length === 3, 'validate รับข้อมูลที่ถูกต้อง');
+for (const [name, m] of [
+  ['schema ผิด', msg({ schema: 2 })], ['source ผิด', msg({ source: 'x' })], ['ช่องเป็นตัวเลข', msg({ regNo: 595 })], ['ช่องหาย', (() => { const x = msg(); delete x.data.subject; return x; })()],
+  ['regNo ว่าง', msg({ regNo: '  ' })], ['url javascript:', msg({ url: 'javascript:alert(1)' })], ['entries ไม่ใช่อาร์เรย์', msg({ entries: 'x' })],
+  ['entry ช่องผิดชนิด', msg({ entries: [{ at: 1, unit: '', name: '', presenter: '', note: '', remark: '' }] })], ['entry เป็น null', msg({ entries: [null] })],
+  ['ISO ผิดรูป', msg({ docDateISO: '<img onerror=1>' })], ['type ผิด', { ...msg(), type: 'other' }], ['ไม่ใช่ object', 'str'], ['null', null], ['อาร์เรย์', []],
+  ['data เป็นอาร์เรย์', { type: 'pms-import', data: [] }],
+]) ok(imp.validate(m) === null, `validate ปฏิเสธ: ${name}`);
+const big = imp.validate(msg({ subject: 'ก'.repeat(5000) + '\u0007x', entries: Array.from({ length: 80 }, () => structuredClone(d.entries[0])) }));
+eq(big.data.subject.length, 2000, 'ตัดสตริงที่ 2000 ตัว'); ok(!/\u0007/.test(big.data.subject.slice(0, 5000)), 'ตัดอักขระควบคุม');
+eq(big.data.entries.length, 50, 'entries สูงสุด 50');
+const poisoned = JSON.parse('{"type":"pms-import","data":' + JSON.stringify(d).slice(0, -1) + ',"__proto__":{"x":1},"extra":"<script>"}}');
+const p = imp.validate(poisoned); ok(p && !('extra' in p.data) && p.data.x === undefined && ({}).x === undefined, 'ช่องแปลกปลอม/__proto__ ถูกทิ้ง');
+const pdf = n => ({ name: 'a.pdf', blob: new Blob([new Uint8Array(n)]) });
+const pm = imp.validate({ ...msg(), pdfs: [pdf(10), pdf(10), pdf(10), pdf(10), pdf(11 * 1024 * 1024), { name: 'x', blob: 'notblob' }, pdf(0)] });
+eq(pm.pdfs.length, 3, 'PDF สูงสุด 3 ไฟล์ (ตัดเกิน/ใหญ่เกิน 10 MB/ไม่ใช่ Blob/ว่าง)');
+eq(pm.pdfs[0].blob.type, 'application/pdf', 'PDF ติดชนิด application/pdf เอง');
+eq(imp.validate({ ...msg(), pdfs: [pdf(11 * 1024 * 1024)] }).pdfs.length, 0, 'PDF > 10 MB ถูกทิ้ง');
+
+// ---- fragment สำรอง ----
+const enc = o => { const b = new TextEncoder().encode(JSON.stringify(o)); let r = ''; for (const x of b) r += String.fromCharCode(x); return btoa(r).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const f = imp.decodeFragment('#/import?d=' + enc(d));
+ok(f && f.data.subject === d.subject && f.data.entries[2].note === 'รับทราบครับ', 'decodeFragment ถอดไทยกลับได้ครบ');
+eq(imp.decodeFragment('#/import?d=' + enc({ ...d, schema: 9 })), null, 'fragment ข้อมูลผิดรูป → null');
+eq(imp.decodeFragment('#/import?d=@@@'), null, 'fragment ไม่ใช่ base64url → null');
+eq(imp.decodeFragment('#/import?x=1'), null, 'ไม่มี d= → null');
+
+// ---- จับคู่งาน ----
+const systems = [{ id: 'tx-stby', name: 'DM TX Radio STBY' }, { id: 'tx-main', name: 'DM TX Radio Main' }, { id: 'vccs', name: 'DM VCCS' }, { id: 'vccs-bk', name: 'DM VCCS Backup' }];
+const jobs = [{ id: 'a', system: 'tx-stby', round: '2/69' }, { id: 'b', system: 'tx-stby', round: '1/70' }, { id: 'c', system: 'tx-main', round: '2/69' }, { id: 'e', system: 'vccs', round: '1/70' }, { id: 'f', system: 'vccs-bk', round: '1/70' }];
+eq((imp.matchJob(jobs, systems, d.subject) || {}).id, 'a', 'จับคู่: Stanby + ครั้งที่ ๒/๒๕๖๙ → DM TX Radio STBY 2/69');
+eq((imp.matchJob(jobs, systems, 'ซ่อมบำรุง DM TX Radio STBY ครั งที ๒/๒๕๖๙') || {}).id, 'a', 'จับคู่: สระ/วรรณยุกต์หายแบบ PDF');
+eq((imp.matchJob(jobs, systems, 'DM VCCS Backup ครั้งที่ ๑/๒๕๗๐') || {}).id, 'f', 'จับคู่: ชื่อยาวสุดชนะ (VCCS Backup ไม่ใช่ VCCS)');
+eq(imp.matchJob(jobs, systems, 'DM CCTV ครั้งที่ ๓/๒๕๖๙'), null, 'ไม่มีงานตรง → null');
+eq(imp.matchJob(jobs, systems, 'DM TX Radio STBY ครั้งที่ ๙/๒๕๖๙'), null, 'ระบบตรงแต่รอบไม่ตรง → null');
+
+// ---- applyImport ----
+const a = imp.applyImport({ id: 'a', data: { keep: 1 }, field_meta: { old: 1 } }, good.data, '2026-10-28T00:00:00.000Z');
+ok(a.data.keep === 1 && a.data.notice.regNo === '595' && a.data.notice.entries.length === 3, 'applyImport: เก็บ data เดิม + notice');
+eq(a.field_meta['notice.docNo'], { source: 'sarabun', locator: 'worklog regNo 595', extracted_at: '2026-10-28T00:00:00.000Z' }, 'field_meta: source/locator/extracted_at');
+ok(a.field_meta.old === 1, 'field_meta เดิมไม่หาย');
+
+document.title = `DONE ${pass}/${total}`;
+out.textContent += `\n${pass}/${total} ผ่าน\n`;
+</script>
