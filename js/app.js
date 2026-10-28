@@ -5,18 +5,18 @@ import { initGestures } from './gestures.js';
 import * as photos from './photos.js';
 import { tok } from './tok.js';
 
-const VERSION = 'v0.1';
+const VERSION = 'v0.2';
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const app = $('#app'), TABS = ['home', 'docs', 'pm', 'man', 'me'];
-const TITLES = { home: 'หน้าหลัก', docs: 'เอกสาร', pm: 'งาน PM', man: 'คู่มือ', me: 'ฉัน' };
-const S = { ph: {}, rev: 0, ui: {}, version: VERSION, user: null, docs: [], templates: [], catalog: null, job: null, recent: [] };
+const app = $('#app'), TABS = ['today', 'pm', 'docs'];
+const TITLES = { today: 'วันนี้', docs: 'เอกสาร', pm: 'งาน PM', me: 'ฉัน' };
+const S = { ph: {}, rev: 0, ui: {}, version: VERSION, user: null, docs: [], templates: [], catalog: null, job: null, started: false };
 const pad = matchMedia(`(min-width:${tok('bp-pad')}px)`);
-let chain = [], tab = 'home', lastTab = null, lastHash = {}, saveT, toastT, tapFn = null;
+let chain = [], tab = 'today', lastTab = null, lastHash = {}, saveT, toastT, tapFn = null;
 
 // ---------- โหลดข้อมูล ----------
 async function load() {
-  [S.docs, S.templates, S.catalog, S.recent] = [(await store.listDocs()).items, await store.listTemplates(), await store.getCatalog(), await store.getRecent()];
-  S.job = S.job || await store.getJob('dm-txs-3-69');
+  [S.docs, S.templates, S.catalog] = [(await store.listDocs()).items, await store.listTemplates(), await store.getCatalog()];
+  S.job = S.job || await store.getJob('dm-txs-3-69'); S.started = !!store.pref('started') || store.hasJob(S.job.id);   // งานที่บันทึกไว้จากเวอร์ชันก่อน = เริ่มแล้ว
   await loadPhotos();
 }
 const photoIds = () => { const j = S.job; return [...j.tx.flatMap(t => Object.values(t.photos)), ...j.tools.map(t => t.photo), ...j.folder.photos.map(p => p.id)].filter(Boolean); };
@@ -32,17 +32,18 @@ async function refresh() {
 // ---------- router: hash → {tab, stack} ----------
 const parts = () => decodeURIComponent(location.hash).replace(/^#\/?/, '').split('/').filter(Boolean);
 function resolve() {
-  let p = parts(); if (!TABS.includes(p[0])) p = ['home'];
-  const t = p[0]; let rest = p.slice(1), doc = null;
+  let p = parts(); const me = p[0] === 'me'; if (!me && !TABS.includes(p[0])) p = ['today'];
+  const t = me ? 'today' : p[0]; let rest = me ? [] : p.slice(1), doc = null;
   const di = rest.indexOf('doc'); if (di > -1) { doc = rest[di + 1]; rest = rest.slice(0, di); }
   const st = [], sysName = id => (S.catalog.systems.find(s => s.id === id) || {}).name || id;
   if (t === 'docs') {
-    if (rest[0] === 'by' && rest.length > 2) st.push({ id: 's-rounds', arg: [0, 0, rest[1], rest[2]], title: rest[1] === 'yr' ? rest[2] : (S.catalog.stations.find(s => s.id === rest[2]) || {}).name });
+    if (rest[0] === 'by' && rest.length > 2) st.push({ id: 's-rounds', arg: [0, 0, rest[1], rest[2]], title: rest[2] });
     else if (rest[0]) { st.push({ id: 's-years', arg: rest[0], title: sysName(rest[0]) }); if (rest[1]) st.push({ id: 's-rounds', arg: [rest[0], rest[1]], title: rest[1] }); }
   } else if (t === 'pm') {
     const m = { fill: [pad.matches ? 's-table' : 's-fill', 'เครื่องส่ง'], table: [pad.matches ? 's-table' : 's-fill', 'เครื่องส่ง'], asset: ['s-asset', 'ทะเบียนอุปกรณ์'], tools: ['s-tools', 'เครื่องมือวัด'], folder: ['s-folder', 'โฟลเดอร์งาน'] }[rest[0]];
     if (m) st.push({ id: m[0], title: m[1] });
   }
+  if (me) st.push({ id: 's-me', title: 'ฉัน' });
   const found = doc && (S.docs.find(d => d.id === doc) || S.templates.find(x => x.code === doc));
   if (found) st.push({ id: 's-view', arg: doc, title: found.title || found.code });
   return { tab: t, chain: [{ id: 's-' + t, title: TITLES[t] }, ...st] };
@@ -67,7 +68,12 @@ function draw() {
   $('.tabbar').classList.remove('mini');
   if (changed) { app.offsetWidth; app.classList.remove('nq'); }
   lastTab = tab; lastHash[tab] = location.hash.split('/doc/')[0];
-  const d = r.chain[n] && r.chain[n].id === 's-view' && r.chain[n].arg; if (d && S.docs.find(x => x.id === d) && (!S.recent[0] || S.recent[0][0] !== d)) store.touchRecent(d).then(async () => { S.recent = await store.getRecent(); S.rev++; draw(); });
+}
+// ลิงก์เก่า #/home → #/today · #/man → #/docs (ฟอร์ม/WI) เก็บ path ย่อยไว้
+function migrate() {
+  const m = location.hash.match(/^#\/(home|man)(\/.*)?$/); if (!m) return;
+  if (m[1] === 'man') S.ui.d = 'd-fm';
+  history.replaceState(null, '', (m[1] === 'home' ? '#/today' : '#/docs') + (m[2] || ''));
 }
 const go = h => { location.hash = h; };
 function pop() {
@@ -155,12 +161,11 @@ async function removePhoto(key) {
 
 // ---------- เหตุการณ์ ----------
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-share],[data-file],[data-photo-del],[data-sel],#loginBtn,#bd');
+  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-start],[data-share],[data-resend],[data-file],[data-photo-del],[data-sel],#bd');
   if (!t) return; const d = t.dataset;
-  if (t.id === 'loginBtn') {
-    $('#s-ms').classList.add('on');
-    setTimeout(() => { store.pref('user', { name: 'ผู้ใช้ตัวอย่าง' }); S.user = { name: 'ผู้ใช้ตัวอย่าง' }; app.classList.remove('login'); $('#s-ms').classList.remove('on'); S.rev++; location.hash.length > 2 ? draw() : go('#/home'); }, 1000);
-  }
+  if (d.pre) { const [k, v] = d.pre.split(':'); if (k === 'cur') { S.job.cur = +v; sched(); } else S.ui[k] = v; S.rev++; }
+  if ('start' in d) { store.pref('started', true); S.started = true; S.rev++; go('#/pm'); }
+  else if ('resend' in d) { e.preventDefault(); toast('Code sent again (demo)', 'ok'); }
   else if ('back' in d) { e.preventDefault(); pop(); }
   else if (t.closest('.tabbar')) { e.preventDefault(); const n = TABS[$$('.tabbar a').indexOf(t)]; if (t.closest('.mini')) $('.tabbar').classList.remove('mini'); else go(n === tab ? '#/' + n : lastHash[n] || '#/' + n); }
   else if (d.sheet) { const [k, id] = d.sheet.split(':'); openSheet(k, id); }
@@ -170,7 +175,7 @@ document.addEventListener('click', e => {
     if (d.off) { store.setOffline(d.off, on); S.rev++; draw(); } else if (d.pref) store.pref(d.pref, on);
   }
   else if (d.offAct) { const on = !V.isOff(S, d.offAct); store.setOffline(d.offAct, on); S.rev++; draw(); toast(on ? 'เก็บไว้ดู offline แล้ว' : 'ลบออกจาก offline แล้ว', on ? 'dl' : 'trash'); }
-  else if (d.pane) { $$('button', t.parentNode).forEach(b => b.setAttribute('aria-pressed', b === t)); const sc = t.closest('.screen'); $$('.pane', sc).forEach(p => { p.hidden = p.id !== d.pane; }); if (/^[pm]-/.test(d.pane)) S.ui[d.pane[0]] = d.pane; }
+  else if (d.pane) { $$('button', t.parentNode).forEach(b => b.setAttribute('aria-pressed', b === t)); $$(':scope > .pane', $('#' + d.pane).parentNode).forEach(p => { p.hidden = p.id !== d.pane; }); if (/^[pmd]-/.test(d.pane)) S.ui[d.pane[0]] = d.pane; }
   else if ('toast' in d) toast(d.toast);
   else if ('cam' in d) { camTarget = d.cam; $('#cam').click(); }
   else if ('file' in d) { camTarget = d.file; $('#file').click(); }
@@ -185,7 +190,7 @@ document.addEventListener('click', e => {
 document.addEventListener('input', e => {
   const i = e.target;
   if (i.dataset.k) setVal(+i.dataset.n, i.dataset.k, i.value);
-  else if ('filter' in i.dataset) { const q = i.value.trim().toLowerCase(); $$('.swr,.pane .grp>.row', i.closest('.screen')).forEach(w => { w.hidden = !w.textContent.toLowerCase().includes(q); }); }
+  else if ('filter' in i.dataset) { const q = i.value.trim().toLowerCase(); $$('.swr,.grp>.row', i.closest('#d-fm,#d-wi') || i.closest('.screen')).forEach(w => { w.hidden = !w.textContent.toLowerCase().includes(q); }); }
 });
 // แถบเหนือคีย์บอร์ด (หน้ากรอกค่า iPhone) + ตารางตัวเลือกช่องของ iPad
 let kt;
@@ -218,16 +223,39 @@ app.addEventListener('scroll', e => {
   if (!long || y <= tok('slop') || sa < -tok('slop')) mini.remove('mini'); else if (sa > tok('dock-shrink')) mini.add('mini');
 }, true);
 
+// ---------- ล็อกอิน (อังกฤษ · ตัวอย่าง): อีเมลบริษัท → รหัส 6 หลัก · demo รับเลข 6 หลักอะไรก็ได้ ----------
+const boxes = () => $$('#codeBoxes input');
+function sendCode() {
+  const m = $('#email'); if (!m.value.trim() || !m.checkValidity()) { m.reportValidity(); return; }
+  $('#s-login').classList.add('code'); $('#sentTo').textContent = m.value.trim(); boxes()[0].focus();
+}
+function finishLogin() {
+  const u = { name: 'สมหมาย', email: $('#email').value.trim() };
+  store.pref('user', u); S.user = u; app.classList.remove('login'); S.rev++; location.hash.length > 2 ? draw() : go('#/today');
+}
+// ใส่ตัวเลขหลายตัวตั้งแต่ช่อง n (วาง / autofill "จากข้อความ") → ช่องถัดไปที่ว่าง หรือส่งเมื่อครบ 6
+function fillCode(d, n) {
+  const b = boxes(); d.split('').slice(0, 6 - n).forEach((c, k) => { b[n + k].value = c; });
+  const e = b.find(x => !x.value); if (e) e.focus(); else finishLogin();
+}
+$('#codeBoxes').addEventListener('input', e => {
+  const i = e.target, b = boxes(), n = b.indexOf(i), d = i.value.replace(/\D/g, '');
+  if (d.length > 1) fillCode(d, n); else { i.value = d; if (d && b[n + 1]) b[n + 1].focus(); if (b.every(x => x.value)) finishLogin(); }
+});
+$('#codeBoxes').addEventListener('paste', e => { e.preventDefault(); fillCode((e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6), boxes().indexOf(e.target)); });
+$('#codeBoxes').addEventListener('keydown', e => { const b = boxes(), n = b.indexOf(e.target); if (e.key === 'Backspace' && !e.target.value && b[n - 1]) b[n - 1].focus(); });
+$('#emailForm').addEventListener('submit', e => { e.preventDefault(); sendCode(); });
+
 // ---------- เริ่มทำงาน ----------
 function themeColor() { $('meta[name=theme-color]').content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(); }
 matchMedia('(prefers-color-scheme:dark)').addEventListener('change', themeColor); themeColor();
 const setPad = () => { document.body.classList.toggle('pad', pad.matches); if (S.job) draw(); };
 pad.addEventListener('change', setPad); document.body.classList.toggle('pad', pad.matches);
-addEventListener('hashchange', () => { closeSheet(); draw(); });
+addEventListener('hashchange', () => { migrate(); closeSheet(); draw(); });
 initGestures({ app, depth: () => chain.length - 1, top: () => $('#' + chain[chain.length - 1].id), parent: () => $('#' + chain[chain.length - 2].id), pop, closeSheet, setM, cur: () => S.job.cur, refresh, isPad: () => pad.matches });
 (async () => {
-  const u = store.pref('user'); S.user = u || { name: 'ผู้ใช้ตัวอย่าง' }; app.classList.toggle('login', !u);
-  await load(); draw();
+  const u = store.pref('user'); S.user = u || { name: 'สมหมาย' }; app.classList.toggle('login', !u);
+  await load(); migrate(); draw();
 })();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   const ready = w => toast('มีเวอร์ชันใหม่ แตะเพื่อโหลด', 'sync', () => w.postMessage('skip'), 0);

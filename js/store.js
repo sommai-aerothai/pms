@@ -14,11 +14,10 @@ export const getDocUrl = id => be().getDocUrl(id);
 export const listTemplates = () => be().listTemplates();
 export const getBlob = id => be().getBlob(id);
 export const getCatalog = () => be().getCatalog();
-export const getRecent = async () => ls.get('pms.recent') || be().getRecent();
-export const touchRecent = async id => ls.set('pms.recent', [[id, new Date().toISOString()], ...(await getRecent()).filter(r => r[0] !== id)].slice(0, 5));
 
 // งาน PM: ค่าที่พิมพ์/รูปเก็บในเครื่อง (localStorage) — ปิดแอปเปิดใหม่ยังอยู่
 export const getJob = async id => ls.get('pms.job.' + id) || be().getJob(id);
+export const hasJob = id => ls.get('pms.job.' + id) != null;
 export const putJob = job => ls.set('pms.job.' + job.id, job);
 
 // ค่าตั้ง/ผู้ใช้/รายการเก็บ offline

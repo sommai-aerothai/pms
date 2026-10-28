@@ -17,22 +17,28 @@
 </head>
 <body>
 <div id="app" class="login">
- <!-- Sign in (English) -->
+ <!-- Sign in (English): company email + one-time code -->
  <section class="full" id="s-login" aria-label="Sign in">
   <div class="logo">PMS</div>
   <div><b>Preventive Maintenance System</b><div class="sec m">CE.SE · AEROTHAI</div></div>
-  <button class="btn" id="loginBtn"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="9" height="9"/><rect x="11" y="0" width="9" height="9"/><rect x="0" y="11" width="9" height="9"/><rect x="11" y="11" width="9" height="9"/></svg>Sign in with AEROTHAI account</button>
-  <p class="sec">Sign-in happens on the Microsoft page; the app never sees your password</p>
+  <form class="lg1" id="emailForm" novalidate>
+   <label class="search"><input type="email" id="email" inputmode="email" autocomplete="email" autocapitalize="off" placeholder="name@aerothai.co.th" aria-label="Work email" required></label>
+   <button class="btn" type="submit">Send code</button>
+  </form>
+  <div class="lg2">
+   <p class="sec">We emailed a 6-digit code to <b id="sentTo"></b></p>
+   <div class="codes" id="codeBoxes" role="group" aria-label="6-digit code"><input inputmode="numeric" autocomplete="one-time-code" aria-label="Digit 1"><input inputmode="numeric" aria-label="Digit 2"><input inputmode="numeric" aria-label="Digit 3"><input inputmode="numeric" aria-label="Digit 4"><input inputmode="numeric" aria-label="Digit 5"><input inputmode="numeric" aria-label="Digit 6"></div>
+   <a href="#" class="rs" data-resend>Resend</a>
+  </div>
+  <p class="sec">No password. Sign-in is tied to your company email.</p>
   <p class="sec">Demo mode · sample data</p>
  </section>
- <section class="full" id="s-ms" aria-label="Simulated Microsoft page"><svg width="40" height="40" viewBox="0 0 20 20" aria-hidden="true"><rect width="9" height="9" style="fill:var(--ms-red)"/><rect x="11" width="9" height="9" style="fill:var(--ms-green)"/><rect y="11" width="9" height="9" style="fill:var(--ms-blue)"/><rect x="11" y="11" width="9" height="9" style="fill:var(--ms-yellow)"/></svg><b>Microsoft</b><span>Redirecting to login.microsoftonline.com…</span></section>
 
  <!-- หน้าจอ: เนื้อหาวาดโดย js/views.js -->
- <section class="screen root" id="s-home"></section>
+ <section class="screen root" id="s-today"></section>
  <section class="screen root" id="s-docs"></section>
  <section class="screen root" id="s-pm"></section>
- <section class="screen root" id="s-man"></section>
- <section class="screen root" id="s-me"></section>
+ <section class="screen push" id="s-me"></section>
  <section class="screen push" id="s-years"></section>
  <section class="screen push" id="s-rounds"></section>
  <section class="screen push" id="s-view"></section>
@@ -45,11 +51,9 @@
  <div id="kbar"><button data-nx="-1">‹ ก่อนหน้า</button><b id="kbl"></b><button data-nx="1">ถัดไป ›</button><button data-sheet="wi">ดู WI</button><button data-done>เสร็จ</button></div>
 
  <nav class="tabbar" aria-label="เมนูหลัก">
-  <a href="#/home" aria-current="page"><svg class="ic"><use href="./ui/icons.svg#i-home"/></svg>หน้าหลัก</a>
-  <a href="#/docs"><svg class="ic"><use href="./ui/icons.svg#i-folder"/></svg>เอกสาร</a>
+  <a href="#/today" aria-current="page"><svg class="ic"><use href="./ui/icons.svg#i-home"/></svg>วันนี้</a>
   <a href="#/pm"><svg class="ic"><use href="./ui/icons.svg#i-clip"/></svg>งาน PM</a>
-  <a href="#/man"><svg class="ic"><use href="./ui/icons.svg#i-book"/></svg>คู่มือ</a>
-  <a href="#/me"><svg class="ic"><use href="./ui/icons.svg#i-user"/></svg>ฉัน</a>
+  <a href="#/docs"><svg class="ic"><use href="./ui/icons.svg#i-folder"/></svg>เอกสาร</a>
  </nav>
 
  <div id="dim"></div>
