@@ -213,7 +213,9 @@ app.addEventListener('scroll', e => {
   const y = e.target.scrollTop, d = y - (e.target._y || 0); e.target._y = y; s.classList.toggle('sc', y > tok('collapse-y'));
   if (s.id === 's-view') $('#pn', s).textContent = Math.min(+$('.pages', s).dataset.pg, Math.floor(y / ($('.page', s).offsetHeight + 14) + .5) + 1);
   if (!d) return; sa = sa * d > 0 ? sa + d : d; const mini = $('.tabbar').classList;
-  if (y <= tok('slop') || sa < -tok('slop')) mini.remove('mini'); else if (sa > tok('dock-shrink')) mini.add('mini');
+  // กฎเดียวทุกหน้า: dock ย่อได้เฉพาะหน้าที่เลื่อนได้เกิน --dock-min-scroll (หน้าสั้นไม่ย่อ)
+  const long = e.target.scrollHeight - e.target.clientHeight > tok('dock-min-scroll');
+  if (!long || y <= tok('slop') || sa < -tok('slop')) mini.remove('mini'); else if (sa > tok('dock-shrink')) mini.add('mini');
 }, true);
 
 // ---------- เริ่มทำงาน ----------
