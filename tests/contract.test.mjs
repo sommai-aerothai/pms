@@ -79,11 +79,11 @@ ok(na.code === 'auth' && hit === 0, 'ไม่มี session → auth (ไม่
   const val = (field, value) => ({ field, value, confidence: 'high' });
   const file = { name: 'ใบจดค่า.jpg', type: 'image/jpeg' };
   const sheet = job => ({ kind: 'image', subkind: 'fieldsheet', target: { form: 'FM-CE.SE-202', page: 1, job }, sheet: { job, page: 1, layout: 'fm202-v1' }, note: '',
-    values: [val('tx[1].power_w', 27.5), val('tx[2].error_hz', -2.1), val('tx[3].spurious_dbc', 66), val('tx[3].mod_pct', null), val('tx[99].power_w', 30)] });
+    values: [val('tx[1].power_w', 27.5), val('tx[2].error_hz', -2.1), val('tx[3].spurious_dbc', 66), val('tx[3].mod_pct', null), { field: 'tx[1].mod_pct', value: 88.8, confidence: 'low' }, val('tx[99].power_w', 30)] });
   let j = mk(), r = await inspect(file, j, ctxFor(sheet('dm-txm-2-69')));
   ok(r.state === 'filled' && r.skipped === 1 && r.read.rows.length === 3, 'ใบจดค่า: งานตรง → filled · แถว 99 ที่ไม่มีในงานถูกข้ามและรายงาน');
   const nf = apply202(j, r.read);
-  ok(j.tx[0].v.pow === '27.5' && j.tx[1].v.err === '-2.1' && j.tx[2].v.spur === '-66' && j.tx[2].v.mod === undefined && j.tx[2].pend.spur && nf === 3, 'ใบจดค่า: ค่าลงถูกแถว · spur เป็นลบ (ฟอร์ม=บวก) · ค่า null ไม่เติม · รอยืนยัน');
+  ok(j.tx[0].v.pow === '27.5' && j.tx[1].v.err === '-2.1' && j.tx[2].v.spur === '-66' && j.tx[2].v.mod === undefined && j.tx[0].v.mod === undefined && j.tx[2].pend.spur && nf === 3, 'ใบจดค่า: ค่าลงถูกแถว · spur เป็นลบ (ฟอร์ม=บวก) · ค่า null ไม่เติม · รอยืนยัน');
   j = mk(); r = await inspect(file, j, ctxFor(sheet('other-job')));
   ok(r.state === 'warn' && !r.read && /ไม่ตรงกับงานนี้/.test(r.text) && j.tx.every(t => !Object.keys(t.v).length), 'ใบจดค่า: job id ไม่ตรง → เตือน ไม่เติม');
   const off = (maint, f2) => ({ kind: 'image', subkind: 'official-handwriting', target: { form: 'FM-CE.SE-202', page: 1 }, text: 'A4: ' + maint, note: '',

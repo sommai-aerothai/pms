@@ -9,7 +9,7 @@ const MAP = { error_hz: 'err', osc_vdc: 'osc', power_w: 'pow', spurious_dbc: 'sp
 export function parse202(values, text = '') {
   const tx = {};
   for (const x of values) {
-    const m = /^tx\[(\d+)\]\.(\w+)$/.exec(x.field); if (!m || x.value == null) continue;   // value null = อ่านไม่มั่นใจ → ไม่เติม
+    const m = /^tx\[(\d+)\]\.(\w+)$/.exec(x.field); if (!m || x.value == null || x.confidence === 'low') continue;   // value null = อ่านไม่มั่นใจ → ไม่เติม
     const t = (tx[m[1]] ||= { n: +m[1], freq: NaN, v: {} });
     if (m[2] === 'freq_mhz') t.freq = +x.value; else if (MAP[m[2]]) { let v = String(x.value); if (m[2] === 'spurious_dbc' && +v > 0) v = String(-v); t.v[MAP[m[2]]] = v; }
   }

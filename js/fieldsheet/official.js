@@ -117,6 +117,7 @@ export function assemble(toks, f) {
   let v = parseFloat(digs.slice(0, dot).join('') + '.' + (digs.slice(dot).join('') || '0')); if (neg && !f.fmt.abs) v = -v;
   const lo = f.range[0], hi = f.range[1], vv = f.fmt.abs ? Math.abs(v) : v;
   if (vv < lo || vv > hi) return { value: null, confidence: 'low', raw, note: `นอกช่วง ${lo}…${hi}` };
+  if (conf === 'low') return { value: null, confidence: 'low', raw, note: 'ความมั่นใจต่ำ · ให้พิมพ์เอง' };
   return { value: v, confidence: conf, raw };
 }
 
