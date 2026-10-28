@@ -233,14 +233,17 @@ function finishLogin() {
   const u = { name: 'สมหมาย', email: $('#email').value.trim() };
   store.pref('user', u); S.user = u; app.classList.remove('login'); S.rev++; location.hash.length > 2 ? draw() : go('#/today');
 }
+// ใส่ตัวเลขหลายตัวตั้งแต่ช่อง n (วาง / autofill "จากข้อความ") → ช่องถัดไปที่ว่าง หรือส่งเมื่อครบ 6
+function fillCode(d, n) {
+  const b = boxes(); d.split('').slice(0, 6 - n).forEach((c, k) => { b[n + k].value = c; });
+  const e = b.find(x => !x.value); if (e) e.focus(); else finishLogin();
+}
 $('#codeBoxes').addEventListener('input', e => {
   const i = e.target, b = boxes(), n = b.indexOf(i), d = i.value.replace(/\D/g, '');
-  if (d.length > 1) { d.slice(0, 6 - n).split('').forEach((c, k) => { b[n + k].value = c; }); b[Math.min(5, n + d.length)].focus(); }   // วางรหัส/autofill ทั้งชุด
-  else { i.value = d; if (d && b[n + 1]) b[n + 1].focus(); }
-  if (b.every(x => x.value)) finishLogin();
+  if (d.length > 1) fillCode(d, n); else { i.value = d; if (d && b[n + 1]) b[n + 1].focus(); if (b.every(x => x.value)) finishLogin(); }
 });
+$('#codeBoxes').addEventListener('paste', e => { e.preventDefault(); fillCode((e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6), boxes().indexOf(e.target)); });
 $('#codeBoxes').addEventListener('keydown', e => { const b = boxes(), n = b.indexOf(e.target); if (e.key === 'Backspace' && !e.target.value && b[n - 1]) b[n - 1].focus(); });
-$('#codeBoxes').addEventListener('paste', e => { e.preventDefault(); const d = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6), b = boxes(); d.split('').forEach((c, k) => { b[k].value = c; }); if (d) b[Math.min(5, d.length)].focus(); if (b.every(x => x.value)) finishLogin(); });
 $('#emailForm').addEventListener('submit', e => { e.preventDefault(); sendCode(); });
 
 // ---------- เริ่มทำงาน ----------
