@@ -34,7 +34,7 @@ export const matchRow = (rows, subject, norm, roundOf) => {
 // ---------- สร้างงานจากแถวตาราง (หรืองานนอกตาราง) ----------
 const V = (v, src, loc, at, x = {}) => ({ v, src, loc, at, ...x });
 export function newPmJob({ id, row, off, system, eng, travel, draft, prev = {}, now, me = '' }) {
-  const base = row ? row.job : off.name, round = row ? row.round : off.round, fy = ORDER.fy, at = now.slice(0, 10);
+  const base = row ? row.job : off.name, round = row ? row.round : off.round, fy = off ? fiscal(off.start).fy : ORDER.fy, at = now.slice(0, 10);
   const vals = {};
   const R = `${ORDER.src}${row ? ' · แถว ' + row.id.slice(-2) : ''}`;
   if (row) {
@@ -53,6 +53,8 @@ export function newPmJob({ id, row, off, system, eng, travel, draft, prev = {}, 
 // ให้งานเก่า/งานจาก backend (โครงเดิม) มีค่าตั้งต้นครบ — ไม่ทับค่าที่มี
 export function normJob(j) {
   const x = { f040: j.status === 'done' ? 'approved' : 'wait', draft: false, eng: '', travel: '', vals: {}, ready: {}, auto: true, files: [], tools: [], pm: { base: j.title, days: null, people: [], off: false }, ...j };
+  const old = ((j.folder && j.folder.photos) || []).filter(p => p.id).map(p => ({ name: p.name || 'รูป', type: p.type || 'image/jpeg', size: 0, state: 'attached', target: '', text: 'ไฟล์จากโฟลเดอร์งานเดิม', id: p.id }));
+  x.files = [...(j.files || []), ...old];
   x.forms = (x.forms || []).map(f => ({ kind: 'manual', ...f, kind: ['tx', 'asset', 'review'].includes(f.kind) ? f.kind : 'manual', done: f.done ?? f.kind === 'done' }));
   return x;
 }
@@ -104,7 +106,7 @@ export function prepChecks(j, ctx) {
 export const prepOk = (j, ctx) => prepChecks(j, ctx).every(c => c.auto);
 export const stageOf = (j, ctx) => j.status === 'done' || j.status === 'submitted' ? 5 : j.f040 !== 'approved' ? 1 : !prepOk(j, ctx) ? 2 : j.forms.every(f => formOk(j, f)) ? 4 : 3;
 export const phaseOf = (j, ctx) => { if (j.status === 'done' || j.status === 'submitted') return 2; const s = stageOf(j, ctx); return s <= 2 ? 0 : s === 3 ? 1 : 2; };
-export const mine = (j, me) => (j.pm && j.pm.people || []).includes(me) || j.owner === me;
+export const mine = (j, me) => (j.pm && j.pm.people || []).includes(me) || j.owner === me || (!(j.pm && j.pm.people || []).length && !j.owner);   // งานโครงเดิมไม่มีรายชื่อ = ยังแสดง
 // เลยกำหนดส่ง (20 วันทำการหลังกลับ) กี่วัน · 0 = ยังไม่เลย/ไม่รู้วัน
 export const overdue = (j, today) => { if (j.status !== 'doing' || !j.dates) return 0; const d = deadline(j, today); return d.left < 0 ? -d.left : 0; };
 export const isReady = (j, ctx) => stageOf(j, ctx) === 4;
