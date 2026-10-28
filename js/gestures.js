@@ -9,7 +9,7 @@ export function initGestures(ctx) {
     g = null;
     if (!e.isPrimary || app.classList.contains('login') || !app.contains(e.target)) return;
     const t = e.target, n = ctx.depth(), gr = t.closest('.grab,.sh-h'), w = t.closest('.swr'), b = { x: e.clientX, y: e.clientY, id: e.pointerId };
-    const s = t.closest('#s-docs,#s-man'), cd = t.closest('#s-fill') && !t.closest('.strip-w,button,input');
+    const s = t.closest('#s-docs'), cd = t.closest('#s-fill') && !t.closest('.strip-w,button,input');
     if (gr && !t.closest('button')) { b.k = 'sh'; b.el = gr.closest('.sheet'); }
     else if ($('.sheet.open')) return;
     else if (n && e.clientX <= tok('edge-w') && !t.closest('input,textarea,select,.sw,.cam')) { b.k = 'bk'; b.top = ctx.top(); b.par = ctx.parent(); }

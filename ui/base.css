@@ -91,9 +91,7 @@ h1.lt{font-size:var(--fs-title);line-height:1.2;font-weight:700;margin:0 var(--s
 /* iPad split */
 .detail{display:none}
 .pad .detail{display:block}
-.pad #s-docs{overflow:hidden}
-.pad .split{display:grid;grid-template-columns:var(--u-320) 1fr;height:calc(100% - var(--st) - var(--tap))}
-.pad .split>div{overflow-y:auto;scrollbar-width:none}
+.pad .split{display:grid;grid-template-columns:var(--u-320) 1fr}
 .pad .split .side{border-right:var(--hair) solid var(--sep)}
 .pad .split .side .grp,.pad .split .detail .grp{margin-left:var(--space-3);margin-right:var(--space-3)}
 .pad .row.sel{background:var(--press)}
@@ -186,8 +184,6 @@ td.bad::after{content:"⚠︎ เกินช่วง";display:block;text-align
 /* login */
 .full{position:absolute;inset:0;z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;gap:var(--u-14);padding:0 var(--u-28);text-align:center;background:var(--bg)}
 .login #s-login{display:flex}
-#s-ms{z-index:65;background:var(--paper);color:var(--paper-ink);gap:var(--u-10)}#s-ms.on{display:flex}
-#s-ms span{color:var(--paper-ink-2);font-size:var(--fs-sub)}
 .logo{font-size:var(--fs-logo);font-weight:800;letter-spacing:calc(var(--u-2)*-1);line-height:1;color:var(--accent)}
 .full .btn{max-width:var(--u-340)}
 .full .sec{font-size:var(--fs-caption);max-width:var(--u-300)}
@@ -200,3 +196,24 @@ td.bad::after{content:"⚠︎ เกินช่วง";display:block;text-align
 .sheet[inert]{visibility:hidden}.sheet:focus{outline:0}
 .ph-view{display:block;width:100%;max-height:50vh;object-fit:contain;background:var(--paper-bg)}
 .pt2{padding-top:var(--space-2)}
+
+/* วันนี้ */
+.th{display:flex;align-items:center;justify-content:space-between;padding-right:var(--space-2)}
+.th h1.lt{margin-bottom:0}
+.avb{width:var(--tap);height:var(--tap);display:flex;align-items:center;justify-content:center;border-radius:var(--radius-control)}
+.avb span{width:var(--u-36);height:var(--u-36);border-radius:var(--radius-control);background:var(--accent);color:var(--accent-on-fill);display:flex;align-items:center;justify-content:center;font-weight:700}
+.today .note{margin:var(--space-1) var(--space-4) var(--space-5)}
+.today .grp{margin-bottom:var(--space-5)}
+.today .bar2{margin-bottom:var(--space-3)}
+/* login: อีเมล → รหัส 6 หลัก */
+.lg1,.lg2{width:100%;max-width:var(--u-340);flex-direction:column;align-items:center;gap:var(--space-3)}
+.lg1{display:flex}.lg2{display:none}
+.code .lg1{display:none}.code .lg2{display:flex}
+.lg1 .search{margin:0;width:100%}
+.codes{display:flex;gap:var(--space-2);width:100%;justify-content:center}
+.codes input{flex:1;min-width:0;max-width:var(--u-48);height:var(--u-48);padding:0;text-align:center;font-size:var(--fs-value);border:var(--hair) solid var(--ctrl-border);border-radius:var(--radius-control);background:var(--card);outline:0}
+.codes input:focus{box-shadow:0 0 0 var(--u-2) var(--accent);border-color:var(--accent)}
+.rs{min-height:var(--tap);display:inline-flex;align-items:center;padding:0 var(--space-4);border-radius:var(--radius-control);color:var(--accent-text);font-weight:600}
+
+.pad #s-docs>.in{max-width:none;margin:0}
+.pad #s-docs>.in .seg{max-width:var(--u-420)}

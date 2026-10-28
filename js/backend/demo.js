@@ -1,17 +1,20 @@
 // ข้อมูลจำลอง (โหมด demo) — โครง JSON ตาม spec §2: schema:1 · id ถาวร · เวลา ISO 8601 UTC
 // ตัวเลขทั้งหมดเป็นตัวอย่างสำหรับดูหน้าตา ไม่ใช่ค่าวัดจริง
-const D = (system, year, round, station, title, modified, pages, crew, status, extra = {}) => ({
-  schema: 1, id: `${system}-${station}-${year}-${round.replace('/', '-')}`, title, system, year, round, station,
+const D = (system, year, round, title, modified, pages, crew, status, extra = {}) => ({
+  schema: 1, id: `${system}-${year}-${round.replace('/', '-')}`, title, system, year, round,
   path: `CE.SE/รายงาน PM/${system}/${year}/${title}.pdf`, modified, by: 'ตัวอย่าง', size: 1.7e6, status, pages, crew, ...extra });
 
 export const catalog = {
   schema: 1,
-  systems: [['radio', 'Radio Tx/Rx', 'radio', 128], ['ils', 'ILS', 'ils', 86], ['vccs', 'VCCS', 'mic', 44], ['dvr', 'DVR', 'disk', 31],
-    ['rcag', 'RCAG', 'tower', 57], ['power', 'Power B/U', 'bat', 63], ['cimc', 'CIMC', 'cpu', 22], ['catis', 'C-ATIS', 'text', 18]]
-    .map(([id, name, icon, count]) => ({ id, name, icon, count })),
+  // ระบบ = ชนิดงาน PM จริงของ DM (ฟอร์มไฟฟ้า/สายอากาศ/CIMC อยู่ในงานวิทยุ ไม่ใช่ระบบแยก)
+  systems: [['rx-main', 'DM RX Radio Main', 'หอฯ ด้านทิศใต้ ชั้น ๒', 'radio', 42], ['rx-stby', 'DM RX Radio STBY', 'หอฯ ด้านทิศเหนือ ชั้น ๕', 'radio', 40],
+    ['tx-main', 'DM TX Radio Main', 'สถานี RADAR', 'radio', 38], ['tx-stby', 'DM TX Radio STBY', 'สถานีเครื่องส่ง', 'radio', 128],
+    ['tx-bk1', 'DM TX Radio Backup 1', 'สถานี ILS', 'radio', 30], ['cctv', 'DM CCTV', '', 'cctv', 24],
+    ['vr', 'DM Voice Recorder', 'หอฯ ทิศเหนือและทิศใต้', 'mic', 31], ['bk-atis', 'DM Radio Backup & ATIS', '', 'radio', 18],
+    ['vccs-bk', 'DM VCCS Backup', 'หอฯ ด้านทิศเหนือ', 'headset', 22], ['vccs', 'DM VCCS', 'หอฯ ด้านทิศใต้', 'headset', 44]]
+    .map(([id, name, loc, icon, count]) => ({ id, name, loc, icon, count })),
   // จำนวนรายงานต่อปี (ตัวอย่าง): radio ตามแล็บ · ระบบอื่นแบ่งตามสัดส่วน
-  years: { radio: { 2569: 14, 2568: 41, 2567: 38, 2566: 35 } },
-  stations: [{ id: 'dm', name: 'สถานีส่งดอนเมือง (DM)', count: 52 }, { id: 'sv', name: 'สถานีส่งสุวรรณภูมิ', count: 47 }, { id: 'ils', name: 'สถานี ILS', count: 30 }],
+  years: { 'tx-stby': { 2569: 14, 2568: 41, 2567: 38, 2566: 35 } },
 };
 // ปีของแต่ละระบบอยู่ใน catalog (backend จริงส่งโครงเดียวกัน) · หน้าจอไม่เรียก demo ตรง
 catalog.systems.forEach(sys => {
@@ -20,15 +23,15 @@ catalog.systems.forEach(sys => {
 });
 
 const docs = [
-  D('radio', 2569, '3/69', 'dm', 'PM DM TxS ครั้งที่ 3/69', '2026-10-26T03:00:00Z', 19, 2, 'draft', { dates: ['2026-11-12', '2026-11-14'] }),
-  D('radio', 2569, '2/69', 'dm', 'PM DM TxS ครั้งที่ 2/69', '2026-10-24T03:00:00Z', 21, 2, 'accepted', { dates: ['2026-08-04', '2026-08-06'] }),
-  D('radio', 2569, '2/69', 'dmrx', 'PM DM RxS ครั้งที่ 2/69', '2026-07-20T03:00:00Z', 17, 2, 'review', { dates: ['2026-07-18', '2026-07-19'] }),
-  D('radio', 2569, '1/69', 'dm', 'PM DM TxS ครั้งที่ 1/69', '2026-04-14T03:00:00Z', 20, 3, 'accepted', { dates: ['2026-04-10', '2026-04-12'] }),
-  D('radio', 2568, '3/68', 'dm', 'PM DM TxS ครั้งที่ 3/68', '2025-11-16T03:00:00Z', 20, 2, 'accepted', { dates: ['2025-11-13', '2025-11-15'] }),
-  D('radio', 2568, '2/68', 'dm', 'PM DM TxS ครั้งที่ 2/68', '2025-08-08T03:00:00Z', 19, 2, 'accepted', { dates: ['2025-08-05', '2025-08-07'] }),
-  D('ils', 2569, '1/69', 'ils', 'DM TX Radio Backup 1 (สถานี ILS)', '2026-10-08T03:00:00Z', 14, 2, 'accepted', { dates: ['2026-10-06', '2026-10-07'] }),
+  D('tx-stby', 2569, '3/69', 'PM DM TX Radio STBY ครั้งที่ 3/69', '2026-10-26T03:00:00Z', 19, 2, 'draft', { dates: ['2026-11-12', '2026-11-14'] }),
+  D('tx-stby', 2569, '2/69', 'PM DM TX Radio STBY ครั้งที่ 2/69', '2026-10-24T03:00:00Z', 21, 2, 'accepted', { dates: ['2026-08-04', '2026-08-06'] }),
+  D('rx-stby', 2569, '2/69', 'PM DM RX Radio STBY ครั้งที่ 2/69', '2026-07-20T03:00:00Z', 17, 2, 'review', { dates: ['2026-07-18', '2026-07-19'] }),
+  D('tx-stby', 2569, '1/69', 'PM DM TX Radio STBY ครั้งที่ 1/69', '2026-04-14T03:00:00Z', 20, 3, 'accepted', { dates: ['2026-04-10', '2026-04-12'] }),
+  D('tx-stby', 2568, '3/68', 'PM DM TX Radio STBY ครั้งที่ 3/68', '2025-11-16T03:00:00Z', 20, 2, 'accepted', { dates: ['2025-11-13', '2025-11-15'] }),
+  D('tx-stby', 2568, '2/68', 'PM DM TX Radio STBY ครั้งที่ 2/68', '2025-08-08T03:00:00Z', 19, 2, 'accepted', { dates: ['2025-08-05', '2025-08-07'] }),
+  D('tx-bk1', 2569, '1/69', 'PM DM TX Radio Backup 1 ครั้งที่ 1/69', '2026-10-08T03:00:00Z', 14, 2, 'accepted', { dates: ['2026-10-06', '2026-10-07'] }),
 ];
-export const recent = [['radio-dm-2569-2-69', '2026-10-27T05:00:00Z'], ['radio-dm-2569-1-69', '2026-10-24T05:00:00Z'], ['ils-ils-2569-1-69', '2026-10-20T05:00:00Z']];
+export const recent = [['tx-stby-2569-2-69', '2026-10-27T05:00:00Z'], ['tx-stby-2569-1-69', '2026-10-24T05:00:00Z'], ['tx-bk1-2569-1-69', '2026-10-20T05:00:00Z']];
 
 const T = (code, rev, name, pages, size, extra = {}) => ({ schema: 1, code, rev, name, pages, size, fetchedAt: '2026-10-28T02:00:00Z',
   sourceUrl: `https://home.aerothai.co.th/cese/node/${extra.kind === 'wi' ? 524 : 526}`, sha256: '0'.repeat(64), kind: 'form', ...extra });
@@ -61,7 +64,7 @@ function seedJob() {
     return { n, freq, model: 'PAE T6T', reg: reg(n), v, photos: {} };
   });
   return {
-    schema: 1, id: 'dm-txs-3-69', title: 'DM TxS 3/69', station: 'dm', dates: ['2026-11-12', '2026-11-14'], letter: true, cur: 7, fields, tx, assetCheck: [6, 7, 8],
+    schema: 1, id: 'dm-txs-3-69', title: 'DM TX Radio STBY 3/69', system: 'tx-stby', dates: ['2026-11-12', '2026-11-14'], letter: true, cur: 7, fields, tx, assetCheck: [6, 7, 8],
     forms: [['FM-CE.SE-202', 'เครื่องส่ง (21 เครื่อง)', 'tx'], ['FM-CE.SE-501', 'สายอากาศ (19 ต้น)'], ['FM-CE.SE-502', 'ไฟฟ้าสำรอง'], ['FM-CE.SE-402', 'CIMC'],
       ['FM-CE.SE-204', 'Spurious (รูป 2)', 'todo', 'cam'], ['FM-CE.SE-041', 'ก่อน/หลัง', 'done'], ['FM-CE.SE-005', 'เครื่องมือวัด', 'done', 'tools'],
       ['FM-CE.SE-001', 'ทะเบียนอุปกรณ์', 'asset'], ['', 'ใบตรวจสอบหลัง PM'], ['FM-CE.SE-006', 'ปก', 'done']]
@@ -73,8 +76,8 @@ function seedJob() {
 }
 
 // ---- สัญญา data layer (ตรงกับ sharepoint.js) ----
-export const listDocs = async ({ system, year, station } = {}) => ({
-  items: docs.filter(d => (!system || d.system === system) && (!year || d.year === +year) && (!station || d.station === station || (station === 'dm' && d.station === 'dmrx'))), next: null });
+export const listDocs = async ({ system, year } = {}) => ({
+  items: docs.filter(d => (!system || d.system === system) && (!year || d.year === +year)), next: null });
 export const getDocUrl = async () => null;          // ไม่มีไฟล์จริง → viewer วาดหน้าตัวอย่าง
 export const listTemplates = async () => templates;
 export const getBlob = async () => new Blob([]);
