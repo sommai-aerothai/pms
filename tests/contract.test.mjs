@@ -136,6 +136,7 @@ ok(na.code === 'auth' && hit === 0, 'ไม่มี session → auth (ไม่
   const nm = (code, file, title = code) => sh.doc({ code, title, file, kind: 'FM' }).title;
   ok(nm('FM-CE.SE-009', 'FM-CE.SE-009 PM RCAG a.pdf') === 'PM RCAG' && nm('FM-CE.SE-002', 'FM-CE.SE-002 รายงาน ok.doc') === 'รายงาน' && nm('FM-CE.SE-002', 'FM-CE.SE-002 รายงาน edit.doc') === 'รายงาน', 'ชื่อจากไฟล์: ตัดนามสกุล/คำเดี่ยวท้าย');
   ok(nm('FM-CE.SE-005', 'FM-CE.SE-005 04 FM-CESE-005 รายการเครื่องมืออะไหล่ edit.doc') === 'รายการเครื่องมืออะไหล่' && nm('FM-CE.SE-009', 'FM-CE.SE-009 PM RCAG a.pdf') === 'PM RCAG', 'ชื่อจากไฟล์: ตัดรหัสซ้ำนำหน้า · คำท้าย edit/a');
+  ok(nm('WI-CE.SE-005', 'WI-CE.SE-005 PM TX.pdf') === 'PM TX' && nm('WI-CE.SE-018', 'WI-CE.SE-018 CM PAE RX ok.pdf') === 'CM PAE RX', 'ชื่อจากไฟล์: TX/RX ตัวใหญ่ไม่ถูกตัด');
   ok(nm('FM-CE.SE-005', 'FM-CE.SE-005 ชื่อไฟล์เก่า.pdf', 'FM-CE.SE-005 ชื่อจริงจากฐาน') === 'ชื่อจริงจากฐาน' && nm('FM-CE.SE-005', 'FM-CE.SE-005 ชื่อไฟล์เก่า.pdf', 'งาน PM') === 'งาน PM', 'title ในฐานที่เป็นชื่อจริงชนะชื่อจากไฟล์ (และไม่โดนตัดคำท้าย)');
 }
 

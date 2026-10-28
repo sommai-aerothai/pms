@@ -27,7 +27,7 @@ const extOf = f => (/\.([A-Za-z0-9]+)$/.exec(f || '') || [])[1]?.toLowerCase() |
 // หนังสือขออนุมัติใช้เอกสาร (ไม่ใช่ตัวฟอร์ม/WI): ชื่อไฟล์ขึ้นต้นปี พ.ศ. 4 หลัก + วส.บว · มี "ขออนุมัติ" · หรือเป็นฉบับลงนาม ผวส.บว → หมวดประกาศ/หนังสือ (ann)
 const isMemo = f => /^\d{4}\s*วส\.?บว|ขออนุมัติ|ผวส\.?บว/.test(String(f || '').split('/').pop());
 // ส่วนที่ติดมาจากชื่อไฟล์ (ใช้เฉพาะชื่อที่ได้จากไฟล์ · ชื่อจากฐานเชื่อตามนั้น): นามสกุลท้าย · รหัสซ้ำนำหน้า "04 FM-CESE-005" · คำเดี่ยวท้าย a/b/ok/edit
-const fromFile = t => tidy(tidy(t).replace(/\.[A-Za-z0-9]{2,4}$/, '').replace(new RegExp('^(?:\\d+\\s+)?' + CODE_PFX.source.slice(1), 'i'), '').replace(/\s+(?:[A-Za-z]{1,2}|ok|edit)$/i, ''));
+const fromFile = t => tidy(tidy(t).replace(/\.[A-Za-z0-9]{2,4}$/, '').replace(new RegExp('^(?:\\d+\\s+)?' + CODE_PFX.source.slice(1), 'i'), '').replace(/\s+(?:[a-z]|ok|edit)$/, ''));   // ตัดเฉพาะ a/b/ok/edit ตัวเล็กท้ายชื่อไฟล์ · TX/RX ตัวใหญ่ = ความหมาย ห้ามตัด
 const nameOf = (title, code, file) => {
   const clean = t => tidy(t.replace(/\([^)]*ไฟล์แก้ได้[^)]*\)/g, '').replace(REV_RE, ' ').replace(code ? new RegExp('^' + code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[\\s\\-–:]*', 'i') : /$^/, ''));
   const t = clean(String(title || '')); if (t && t !== code) return t;
