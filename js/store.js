@@ -1,5 +1,6 @@
 // สัญญา data layer เดียวที่หน้าจอรู้จัก · backend เลือกจาก localStorage 'pms.backend' (ค่าเริ่ม 'demo')
 import * as demo from './backend/demo.js';
+import { wipe as wipePhotos } from './photos.js';
 import * as sharepoint from './backend/sharepoint.js';
 
 const ls = {
@@ -25,4 +26,8 @@ export const pref = (k, v) => (v === undefined ? ls.get('pms.' + k) : ls.set('pm
 export const isOffline = (id, dflt) => { const s = ls.get('pms.offline') || {}; return id in s ? s[id] : dflt; };
 export const setOffline = (id, on) => ls.set('pms.offline', { ...(ls.get('pms.offline') || {}), [id]: on });
 export const offlineCount = () => Object.values(ls.get('pms.offline') || {}).filter(Boolean).length;
-export const signOut = () => { try { localStorage.clear(); } catch {} };
+// ออกจากระบบ: ลบเฉพาะคีย์ pms.* (+ รูปของ PMS) · ไม่แตะข้อมูลอื่นบนออริจินเดียวกัน
+export const signOut = async () => {
+  try { Object.keys(localStorage).filter(k => k.startsWith('pms.')).forEach(k => localStorage.removeItem(k)); } catch {}
+  await wipePhotos();
+};

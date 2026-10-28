@@ -13,10 +13,11 @@ export const catalog = {
   years: { radio: { 2569: 14, 2568: 41, 2567: 38, 2566: 35 } },
   stations: [{ id: 'dm', name: 'สถานีส่งดอนเมือง (DM)', count: 52 }, { id: 'sv', name: 'สถานีส่งสุวรรณภูมิ', count: 47 }, { id: 'ils', name: 'สถานี ILS', count: 30 }],
 };
-export function yearsOf(sys) {
+// ปีของแต่ละระบบอยู่ใน catalog (backend จริงส่งโครงเดียวกัน) · หน้าจอไม่เรียก demo ตรง
+catalog.systems.forEach(sys => {
   const y = catalog.years[sys.id] || Object.fromEntries([2569, 2568, 2567].map((k, i) => [k, Math.round(sys.count * [.2, .4, .4][i])]));
-  return Object.entries(y).sort((a, b) => b[0] - a[0]).map(([year, count]) => ({ year: +year, count }));
-}
+  sys.years = Object.entries(y).sort((a, b) => b[0] - a[0]).map(([year, count]) => ({ year: +year, count }));
+});
 
 const docs = [
   D('radio', 2569, '3/69', 'dm', 'PM DM TxS ครั้งที่ 3/69', '2026-10-26T03:00:00Z', 19, 2, 'draft', { dates: ['2026-11-12', '2026-11-14'] }),

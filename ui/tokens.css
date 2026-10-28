@@ -20,6 +20,9 @@
 --ease:cubic-bezier(.32,.72,0,1);--ease-spring:cubic-bezier(.32,1.4,.5,1);--dur-press:.1s;--dur-fade:.15s;--dur-quick:.2s;--dur-base:.25s;--dur-sheet:.3s;--dur-push:.35s;--dur-spin:1s;
 /* sizes */
 --tap:44px;--dock-h:64px;--dock-min-h:44px;--dock-w-pad:560px;--kbar-h:48px;--sheet-max:600px;
+/* size units (px ที่ใช้ใน base.css) + ค่าท่าทาง/อื่น ๆ ที่ JS อ่านผ่าน getComputedStyle */
+--u-2:2px;--u-3:3px;--u-4:4px;--u-5:5px;--u-6:6px;--u-8:8px;--u-10:10px;--u-12:12px;--u-14:14px;--u-16:16px;--u-17:17px;--u-18:18px;--u-20:20px;--u-22:22px;--u-24:24px;--u-27:27px;--u-28:28px;--u-31:31px;--u-36:36px;--u-38:38px;--u-48:48px;--u-50:50px;--u-51:51px;--u-52:52px;--u-68:68px;--u-80:80px;--u-84:84px;--u-88:88px;--u-120:120px;--u-140:140px;--u-210:210px;--u-300:300px;--u-320:320px;--u-340:340px;--u-420:420px;--u-520:520px;--u-760:760px;
+--hair:1px;--swipe-w:96px;--swipe-open:48px;--edge-w:40px;--slop:8px;--ptr-go:70px;--ptr-max:56px;--ptr-open:44px;--card-swipe:60px;--sheet-dismiss:120px;--collapse-y:32px;--dock-shrink:24px;--dock-gap:8px;--bp-pad:900px;--opacity-dim:.25;--photo-max:1024;--photo-q:.7;--toast-ms:1800;--refresh-ms:800;
 /* safe area (iPhone notch / home indicator) */
 --st:env(safe-area-inset-top,0px);--sa:env(safe-area-inset-bottom,0px);
 color-scheme:light dark}

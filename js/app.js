@@ -2,19 +2,26 @@
 import * as store from './store.js';
 import * as V from './views.js';
 import { initGestures } from './gestures.js';
+import * as photos from './photos.js';
+import { tok } from './tok.js';
 
 const VERSION = 'v0.1';
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const app = $('#app'), TABS = ['home', 'docs', 'pm', 'man', 'me'];
 const TITLES = { home: 'หน้าหลัก', docs: 'เอกสาร', pm: 'งาน PM', man: 'คู่มือ', me: 'ฉัน' };
-const S = { rev: 0, ui: {}, version: VERSION, user: null, docs: [], templates: [], catalog: null, job: null, recent: [] };
-const pad = matchMedia('(min-width:900px)');
+const S = { ph: {}, rev: 0, ui: {}, version: VERSION, user: null, docs: [], templates: [], catalog: null, job: null, recent: [] };
+const pad = matchMedia(`(min-width:${tok('bp-pad')}px)`);
 let chain = [], tab = 'home', lastTab = null, lastHash = {}, saveT, toastT, tapFn = null;
 
 // ---------- โหลดข้อมูล ----------
 async function load() {
   [S.docs, S.templates, S.catalog, S.recent] = [(await store.listDocs()).items, await store.listTemplates(), await store.getCatalog(), await store.getRecent()];
   S.job = S.job || await store.getJob('dm-txs-3-69');
+  await loadPhotos();
+}
+const photoIds = () => { const j = S.job; return [...j.tx.flatMap(t => Object.values(t.photos)), ...j.tools.map(t => t.photo), ...j.folder.photos.map(p => p.id)].filter(Boolean); };
+async function loadPhotos() {
+  for (const id of photoIds()) if (!S.ph[id]) { try { const b = await photos.get(id); if (b) S.ph[id] = URL.createObjectURL(b); } catch { /* IndexedDB ใช้ไม่ได้ → ไม่มี thumbnail */ } }
 }
 const errWord = e => ({ auth: 'ต้องเข้าสู่ระบบใหม่', offline: 'ออฟไลน์อยู่', notfound: 'ไม่พบข้อมูล', throttled: 'ระบบยุ่ง ลองใหม่อีกครั้ง' }[e.code] || 'เกิดข้อผิดพลาด');
 async function refresh() {
@@ -45,7 +52,7 @@ function paint(c, i) {
   if (el.dataset.k === key) return;
   const y = el.dataset.a === a ? el.scrollTop : 0;
   el.innerHTML = V[c.id.slice(2)](S, c.arg, i ? chain[i - 1].title : null);
-  el.dataset.k = key; el.dataset.a = a; el.scrollTop = y; el.classList.toggle('sc', y > 32);
+  el.dataset.k = key; el.dataset.a = a; el.scrollTop = y; el.classList.toggle('sc', y > tok('collapse-y'));
   if (c.id === 's-fill') centerChip();
 }
 function draw() {
@@ -60,7 +67,7 @@ function draw() {
   $('.tabbar').classList.remove('mini');
   if (changed) { app.offsetWidth; app.classList.remove('nq'); }
   lastTab = tab; lastHash[tab] = location.hash.split('/doc/')[0];
-  const d = r.chain[n] && r.chain[n].id === 's-view' && r.chain[n].arg; if (d && S.docs.find(x => x.id === d)) store.touchRecent(d).then(async () => { S.recent = await store.getRecent(); });
+  const d = r.chain[n] && r.chain[n].id === 's-view' && r.chain[n].arg; if (d && S.docs.find(x => x.id === d) && (!S.recent[0] || S.recent[0][0] !== d)) store.touchRecent(d).then(async () => { S.recent = await store.getRecent(); S.rev++; draw(); });
 }
 const go = h => { location.hash = h; };
 function pop() {
@@ -70,16 +77,26 @@ function pop() {
 }
 
 // ---------- sheet / toast ----------
-function openSheet(kind, id) { $('#sheet').innerHTML = V.sheet(S, kind, id); $('#sheet').classList.add('open'); $('#bd').classList.add('open'); }
-function closeSheet() { $$('.sheet.open,.bd.open').forEach(x => x.classList.remove('open')); }
-function toast(text, icon = 'info', fn = null, ms = 1800) {
+let opener = null;
+const bg = () => [...app.children].filter(c => !['sheet', 'bd', 'toast'].includes(c.id));
+function openSheet(kind, id) {
+  opener = document.activeElement; const sh = $('#sheet');
+  sh.innerHTML = V.sheet(S, kind, id); sh.classList.add('open'); $('#bd').classList.add('open');
+  bg().forEach(c => c.inert = true); sh.setAttribute('tabindex', '-1'); $('.sh-h button', sh).focus();
+}
+function closeSheet() {
+  if (!$('.sheet.open')) return;
+  $$('.sheet.open,.bd.open').forEach(x => x.classList.remove('open')); bg().forEach(c => { c.inert = false; });
+  if (opener && opener.isConnected) opener.focus(); opener = null;
+}
+function toast(text, icon = 'info', fn = null, ms = tok('toast-ms')) {
   const x = $('#toast'); $('span', x).textContent = text; $('use', x).setAttribute('href', `./ui/icons.svg#i-${icon}`);
   x.classList.add('on'); tapFn = fn; clearTimeout(toastT); if (ms) toastT = setTimeout(() => x.classList.remove('on'), ms);
 }
 $('#toast').addEventListener('click', () => { if (tapFn) tapFn(); });
 
 // ---------- บันทึกค่าที่กรอก ----------
-function save() { clearTimeout(saveT); saveT = 0; if (!store.putJob(S.job)) toast('พื้นที่เก็บเต็ม — บันทึกไม่ได้', 'warn', null, 3500); }
+function save() { clearTimeout(saveT); saveT = 0; const ok = store.putJob(S.job); if (!ok) toast('พื้นที่เก็บเต็ม — บันทึกไม่ได้', 'warn', null, 3500); return ok; }
 const sched = () => { clearTimeout(saveT); saveT = setTimeout(save, 300); };
 const later = () => { S.rev++; sched(); };
 addEventListener('pagehide', () => saveT && save());
@@ -106,26 +123,39 @@ function nx(d) {
   a[Math.max(i, 0)].focus();
 }
 
-// ---------- กล้อง: ย่อ ≤1024px เก็บเป็น dataURL ใน job ----------
+// ---------- กล้อง / ไฟล์: ย่อรูป แล้วเก็บใน IndexedDB (job เก็บแค่ id) ----------
 let camTarget = null;
+const slotOf = key => { const [a, b] = key.split('.'), j = S.job; return a === 'folder' ? { o: j.folder.photos[+b], k: 'id' } : a === 'tool' ? { o: j.tools[+b], k: 'photo' } : { o: j.tx[a - 1].photos, k: b }; };
 async function shrink(file) {
-  const bm = await createImageBitmap(file), r = Math.min(1, 1024 / Math.max(bm.width, bm.height)), c = document.createElement('canvas');
+  const bm = await createImageBitmap(file), r = Math.min(1, tok('photo-max') / Math.max(bm.width, bm.height)), c = document.createElement('canvas');
   c.width = Math.round(bm.width * r); c.height = Math.round(bm.height * r); c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height);
-  return c.toDataURL('image/jpeg', .7);
+  return new Promise((ok, no) => c.toBlob(b => b ? ok(b) : no(), 'image/jpeg', tok('photo-q')));
 }
-$('#cam').addEventListener('change', async e => {
-  const f = e.target.files[0]; e.target.value = ''; if (!f || !camTarget) return;
-  try {
-    const url = await shrink(f), [a, b] = camTarget.split('.'), j = S.job;
-    if (a === 'folder') j.folder.photos.push({ name: 'รูป ' + (j.folder.photos.length + 1), url });
-    else if (a === 'tool') j.tools[+b].photo = url; else j.tx[a - 1].photos[b] = url;
-    save(); S.rev++; draw(); toast('บันทึกรูปแล้ว', 'cam');
-  } catch { toast('อ่านรูปไม่ได้ ลองถ่ายใหม่', 'warn'); }
-});
+async function attach(f) {
+  let blob = f, id;
+  try { if (f.type.startsWith('image/')) blob = await shrink(f); } catch { toast('อ่านรูปไม่ได้ ลองถ่ายใหม่', 'warn'); return; }
+  try { id = await photos.put(blob); } catch { toast('เก็บรูปไม่ได้ (พื้นที่เต็มหรือถูกปิดไว้)', 'warn'); return; }
+  const j = S.job, isNew = camTarget === 'folder', sl = isNew ? null : slotOf(camTarget), old = isNew ? null : sl.o[sl.k];
+  if (isNew) j.folder.photos.push({ name: f.name || 'รูป ' + (j.folder.photos.length + 1), type: blob.type, id }); else sl.o[sl.k] = id;
+  if (!save()) {   // บันทึกงานไม่สำเร็จ → ย้อนกลับ ไม่แจ้งว่าสำเร็จ
+    if (isNew) j.folder.photos.pop(); else sl.o[sl.k] = old; photos.del(id).catch(() => {}); return;
+  }
+  S.ph[id] = URL.createObjectURL(blob);
+  if (old) { photos.del(old).catch(() => {}); URL.revokeObjectURL(S.ph[old]); delete S.ph[old]; }
+  closeSheet(); S.rev++; draw(); toast('บันทึกแล้ว', 'cam');
+}
+async function removePhoto(key) {
+  const sl = slotOf(key), id = sl.o[sl.k], j = S.job;
+  if (key.startsWith('folder')) j.folder.photos.splice(+key.split('.')[1], 1); else sl.o[sl.k] = '';
+  if (!save()) return;
+  photos.del(id).catch(() => {}); URL.revokeObjectURL(S.ph[id]); delete S.ph[id];
+  closeSheet(); S.rev++; draw(); toast('ลบแล้ว', 'trash');
+}
+['#cam', '#file'].forEach(q => $(q).addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f && camTarget) attach(f); }));
 
 // ---------- เหตุการณ์ ----------
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-share],[data-sel],#loginBtn,#bd');
+  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-share],[data-file],[data-photo-del],[data-sel],#loginBtn,#bd');
   if (!t) return; const d = t.dataset;
   if (t.id === 'loginBtn') {
     $('#s-ms').classList.add('on');
@@ -143,10 +173,12 @@ document.addEventListener('click', e => {
   else if (d.pane) { $$('button', t.parentNode).forEach(b => b.setAttribute('aria-pressed', b === t)); const sc = t.closest('.screen'); $$('.pane', sc).forEach(p => { p.hidden = p.id !== d.pane; }); if (/^[pm]-/.test(d.pane)) S.ui[d.pane[0]] = d.pane; }
   else if ('toast' in d) toast(d.toast);
   else if ('cam' in d) { camTarget = d.cam; $('#cam').click(); }
+  else if ('file' in d) { camTarget = d.file; $('#file').click(); }
+  else if ('photoDel' in d) removePhoto(d.photoDel);
   else if (d.m) setM(+d.m);
   else if (d.nx) nx(+d.nx);
   else if ('done' in d) document.activeElement.blur();
-  else if ('signout' in d) { store.signOut(); history.replaceState(null, '', location.pathname); location.reload(); }
+  else if ('signout' in d) { store.signOut().then(() => { history.replaceState(null, '', location.pathname); location.reload(); }); }
   else if ('share' in d) { const u = location.href; navigator.share ? navigator.share({ url: u }).catch(() => {}) : toast('แชร์ยังไม่เปิดใช้ในเบราว์เซอร์นี้'); }
   else if (d.sel && pad.matches) { e.preventDefault(); S.ui.sel = d.sel; S.rev++; draw(); }
 });
@@ -173,15 +205,15 @@ document.addEventListener('keydown', e => {
 });
 $('#kbar').addEventListener('pointerdown', e => e.preventDefault());   // ไม่ให้ช่องกรอกเสียโฟกัส
 const vv = window.visualViewport;
-if (vv) { const kb = () => document.documentElement.style.setProperty('--kbh', Math.max(0, innerHeight - vv.height - vv.offsetTop) + 'px'); vv.addEventListener('resize', kb); vv.addEventListener('scroll', kb); }
+if (vv) { const kb = () => { const r = document.documentElement.style; r.setProperty('--kbh', Math.max(0, innerHeight - vv.height - vv.offsetTop) + 'px'); r.setProperty('--kbt', vv.offsetTop + vv.height - tok('kbar-h') + 'px'); }; vv.addEventListener('resize', kb); vv.addEventListener('scroll', kb); }
 // ไถลง = dock ย่อ · title ใหญ่ยุบเข้า nav
 let sa = 0;
 app.addEventListener('scroll', e => {
   const s = e.target.closest && e.target.closest('.screen'); if (!s) return;
-  const y = e.target.scrollTop, d = y - (e.target._y || 0); e.target._y = y; s.classList.toggle('sc', y > 32);
+  const y = e.target.scrollTop, d = y - (e.target._y || 0); e.target._y = y; s.classList.toggle('sc', y > tok('collapse-y'));
   if (s.id === 's-view') $('#pn', s).textContent = Math.min(+$('.pages', s).dataset.pg, Math.floor(y / ($('.page', s).offsetHeight + 14) + .5) + 1);
   if (!d) return; sa = sa * d > 0 ? sa + d : d; const mini = $('.tabbar').classList;
-  if (y <= 8 || sa < -8) mini.remove('mini'); else if (sa > 24) mini.add('mini');
+  if (y <= tok('slop') || sa < -tok('slop')) mini.remove('mini'); else if (sa > tok('dock-shrink')) mini.add('mini');
 }, true);
 
 // ---------- เริ่มทำงาน ----------
@@ -198,6 +230,7 @@ initGestures({ app, depth: () => chain.length - 1, top: () => $('#' + chain[chai
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   const ready = w => toast('มีเวอร์ชันใหม่ แตะเพื่อโหลด', 'sync', () => w.postMessage('skip'), 0);
   navigator.serviceWorker.register('./sw.js').then(r => {
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) r.update().catch(() => {}); });
     if (r.waiting && navigator.serviceWorker.controller) ready(r.waiting);
     r.addEventListener('updatefound', () => { const w = r.installing; w.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) ready(w); }); });
   });

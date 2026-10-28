@@ -1,16 +1,19 @@
 // cache-first สำหรับไฟล์แอป · network-first สำหรับข้อมูล (/api/ /data/) · เปลี่ยน VERSION ทุกครั้งที่แก้ไฟล์
-const VERSION = 'pms-v0.1.0';
+const VERSION = 'pms-v0.1.1';
 const FILES = ['./', './index.html', './manifest.webmanifest', './ui/tokens.css', './ui/base.css', './ui/icons.svg',
-  './js/app.js', './js/views.js', './js/gestures.js', './js/store.js', './js/backend/demo.js', './js/backend/sharepoint.js',
+  './js/app.js', './js/views.js', './js/gestures.js', './js/store.js', './js/photos.js', './js/tok.js', './js/backend/demo.js', './js/backend/sharepoint.js',
   './icons/icon.svg', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES))));   // ไม่ skipWaiting เอง: รอผู้ใช้แตะ toast
-self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim())));
+self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('pms-') && k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('message', e => { if (e.data === 'skip') self.skipWaiting(); });
 self.addEventListener('fetch', e => {
   const r = e.request, u = new URL(r.url);
   if (r.method !== 'GET' || u.origin !== location.origin) return;
   if (/\/(api|data)\//.test(u.pathname)) {
-    e.respondWith(fetch(r).then(res => { const cp = res.clone(); caches.open(VERSION).then(c => c.put(r, cp)); return res; }).catch(() => caches.match(r)));
-  } else e.respondWith(caches.match(r, { ignoreSearch: true }).then(hit => hit || fetch(r)));
+    e.respondWith(fetch(r).then(res => {
+      if (res.ok) { const cp = res.clone(); e.waitUntil(caches.open(VERSION).then(c => c.put(r, cp))); }   // เก็บเฉพาะคำตอบ ok
+      return res;
+    }).catch(() => caches.match(r)));
+  } else e.respondWith(caches.match(r).then(hit => hit || fetch(r)));
 });
