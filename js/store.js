@@ -13,7 +13,7 @@ const BE = { demo, sharepoint, supabase };
 export const backendName = () => { let v; try { v = localStorage.getItem('pms.backend'); } catch {} return BE[v] ? v : BE[CONFIG.backend] ? CONFIG.backend : 'demo'; };   // ค่าดิบ ไม่ใช่ JSON
 const be = () => BE[backendName()];
 export const setBackend = n => { try { localStorage.setItem('pms.backend', n); } catch {} };
-export const auth = () => be();   // requestOtp / verifyOtp / me (เฉพาะ backend จริง)
+export const auth = () => be();   // signIn / changePassword / me (เฉพาะ backend จริง)
 
 export const listDocs = p => be().listDocs(p || {});
 export const getDocUrl = id => be().getDocUrl(id);

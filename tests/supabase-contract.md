@@ -5,8 +5,8 @@
 
 | ฟังก์ชัน | Endpoint | สถานะที่ต้องได้ | ตรวจอะไร |
 |---|---|---|---|
-| requestOtp(email) | POST /auth/v1/otp `{email, create_user:true}` | 200 | อีเมลถึงภายใน ~1 นาที มีรหัส 6 หลัก |
-| verifyOtp(email, token) | POST /auth/v1/verify `{type:'email',email,token}` | 200 | `pms.session` มี access_token/refresh_token/expires_at/user · รหัสผิด = 4xx → toast "รหัสไม่ถูกหรือหมดอายุ" |
+| signIn(email, password) | POST /auth/v1/token?grant_type=password `{email,password}` | 200 | `pms.session` มี access_token/refresh_token/expires_at/user · รหัสผิด = 400 `invalid_credentials` → `{code:'auth'}` → หน้า login ขึ้น "Wrong username or password" |
+| changePassword(pw) | PUT /auth/v1/user `{password}` (token ผู้ใช้) | 200 | สั้นกว่า 8 ตัว = `{code:'invalid'}` ไม่ยิงเครือข่าย · 422 = `invalid` · สำเร็จ = toast "เปลี่ยนรหัสผ่านแล้ว" แล้วออก/เข้าใหม่ด้วยรหัสใหม่ได้ |
 | refresh() | POST /auth/v1/token?grant_type=refresh_token | 200 | เรียกอัตโนมัติเมื่อเหลือ <30 วิ · refresh_token เสีย = ล้าง session แล้ว `auth` |
 | signOut() | (ไม่เรียกเครือข่าย) | - | `pms.session` ถูกลบ |
 | me() | GET /rest/v1/profiles?id=eq.<uid>&select=* | 200 | แถวเดียว · `approved=false` → หน้า "รออนุมัติ" + ปุ่ม "ตรวจสอบอีกครั้ง" · แอดมินกดอนุมัติแล้วกดปุ่มเข้าได้ |

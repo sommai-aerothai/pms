@@ -14,22 +14,23 @@ async function call(path, { method = 'GET', body, headers = {}, auth = true, raw
   if (navigator.onLine === false) fail('offline');
   let s = session();
   if (auth && s && s.expires_at * 1000 < Date.now() + 30000) s = await refresh();
-  const h = { apikey: CONFIG.anonKey, Authorization: `Bearer ${(auth && s && s.access_token) || CONFIG.anonKey}`, ...headers };
+  const h = { apikey: CONFIG.anonKey, ...((auth && s && s.access_token) ? { Authorization: `Bearer ${s.access_token}` } : {}), ...headers };   // publishable key ส่งเฉพาะ apikey · Bearer เฉพาะเมื่อมี token ผู้ใช้
   if (body !== undefined && !(body instanceof Blob)) { h['Content-Type'] = 'application/json'; body = JSON.stringify(body); }
   let r;
   try { r = await fetch(CONFIG.supabaseUrl + path, { method, headers: h, body }); } catch { fail('offline'); }
   if (r.ok) return raw ? r : (r.status === 204 ? null : r.json().catch(() => null));
-  if (r.status === 401 || r.status === 403 || (!auth && r.status < 500 && r.status !== 429)) fail('auth');   // OTP/refresh ที่ถูกปฏิเสธ = auth
+  if (r.status === 401 || r.status === 403 || (!auth && r.status < 500 && r.status !== 429)) fail('auth');   // เข้าสู่ระบบ/refresh ที่ถูกปฏิเสธ (400 invalid_credentials) = auth
   if (r.status === 404) fail('notfound');
+  if (r.status === 422) fail('invalid');   // เช่น รหัสผ่านใหม่ซ้ำกับรหัสเดิม/อ่อนเกิน
   if (r.status === 429) fail('throttled', +r.headers.get('Retry-After') || 30);
   fail('server');
 }
 const rest = (q, o) => call('/rest/v1/' + q, o);
 
-// ---- เข้าสู่ระบบ (อีเมล + OTP 6 หลัก) ----
-export const requestOtp = email => call('/auth/v1/otp', { method: 'POST', auth: false, body: { email, create_user: true } });
+// ---- เข้าสู่ระบบ (ชื่อผู้ใช้ = อีเมล + รหัสผ่าน · แอดมินสร้างบัญชี ไม่มีสมัครเอง) ----
 const keep = j => { const s = { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: j.expires_at || Math.floor(Date.now() / 1000) + j.expires_in, user: j.user }; ls.set(SK, s); return s; };
-export const verifyOtp = async (email, token) => keep(await call('/auth/v1/verify', { method: 'POST', auth: false, body: { type: 'email', email, token } }));
+export const signIn = async (email, password) => keep(await call('/auth/v1/token?grant_type=password', { method: 'POST', auth: false, body: { email, password } }));
+export const changePassword = async password => { if (String(password).length < 8) fail('invalid'); await call('/auth/v1/user', { method: 'PUT', body: { password } }); };
 export async function refresh() {
   const s = session(); if (!s) fail('auth');
   try { return keep(await call('/auth/v1/token?grant_type=refresh_token', { method: 'POST', auth: false, body: { refresh_token: s.refresh_token } })); }

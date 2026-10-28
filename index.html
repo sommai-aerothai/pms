@@ -17,25 +17,22 @@
 </head>
 <body>
 <div id="app" class="login">
- <!-- Sign in (English): company email + one-time code -->
+ <!-- Sign in (English): username + password -->
  <section class="full" id="s-login" aria-label="Sign in">
   <div class="logo">PMS</div>
   <div><b>Preventive Maintenance System</b><div class="sec m">CE.SE · AEROTHAI</div></div>
-  <form class="lg1" id="emailForm" novalidate>
-   <label class="search"><input type="email" id="email" inputmode="email" autocomplete="email" autocapitalize="off" placeholder="name@aerothai.co.th" aria-label="Work email" required></label>
-   <button class="btn" type="submit">Send code</button>
+  <form class="lg1" id="loginForm" novalidate>
+   <label class="search"><input type="email" id="email" name="username" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="name@aerothai.co.th" aria-label="Username"></label>
+   <label class="search"><input type="password" id="pass" name="password" autocomplete="current-password" placeholder="Password" aria-label="Password"><button class="peek" type="button" data-peek aria-label="Show password" aria-pressed="false"><svg class="ic"><use href="./ui/icons.svg#i-eye"/></svg></button></label>
+   <p class="st w lg-err" id="lgErr" role="alert" hidden><svg class="ic"><use href="./ui/icons.svg#i-warn"/></svg><span></span></p>
+   <button class="btn" type="submit">Sign in</button>
   </form>
-  <div class="lg2">
-   <p class="sec">We emailed a 6-digit code to <b id="sentTo"></b></p>
-   <div class="codes" id="codeBoxes" role="group" aria-label="6-digit code"><input inputmode="numeric" autocomplete="one-time-code" aria-label="Digit 1"><input inputmode="numeric" aria-label="Digit 2"><input inputmode="numeric" aria-label="Digit 3"><input inputmode="numeric" aria-label="Digit 4"><input inputmode="numeric" aria-label="Digit 5"><input inputmode="numeric" aria-label="Digit 6"></div>
-   <a href="#" class="rs" data-resend>Resend</a>
-  </div>
   <div class="lg3">
    <svg class="ic"><use href="./ui/icons.svg#i-lock"/></svg><b>รออนุมัติ</b>
    <p class="sec">ผู้ดูแลกองต้องอนุมัติบัญชีของคุณก่อนใช้งาน</p>
    <button class="btn" type="button" data-recheck>ตรวจสอบอีกครั้ง</button>
   </div>
-  <p class="sec">No password. Sign-in is tied to your company email.</p>
+  <p class="sec">Accounts are created by your administrator.</p>
   <p class="sec">Demo mode · sample data</p>
  </section>
 

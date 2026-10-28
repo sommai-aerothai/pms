@@ -201,17 +201,16 @@ td.bad::after{content:"⚠︎ เกินช่วง";display:block;text-align
 .today .note{margin:var(--space-1) var(--space-4) var(--space-5)}
 .today .grp{margin-bottom:var(--space-5)}
 .today .bar2{margin-bottom:var(--space-3)}
-/* login: อีเมล → รหัส 6 หลัก */
-.lg1,.lg2{width:100%;max-width:var(--u-340);flex-direction:column;align-items:center;gap:var(--space-3)}
-.lg1{display:flex}.lg2{display:none}
-.code .lg1{display:none}.code .lg2{display:flex}
+/* login: ชื่อผู้ใช้ + รหัสผ่าน */
+.lg1{display:flex;width:100%;max-width:var(--u-340);flex-direction:column;align-items:center;gap:var(--space-3)}
 .lg3{display:none;width:100%;max-width:var(--u-340);flex-direction:column;align-items:center;gap:var(--space-3)}
-.wait .lg1,.wait .lg2{display:none}.wait .lg3{display:flex}.lg3 .ic{width:var(--u-36);height:var(--u-36);color:var(--accent)}
+.wait .lg1{display:none}.wait .lg3{display:flex}.lg3 .ic{width:var(--u-36);height:var(--u-36);color:var(--accent)}
 .lg1 .search{margin:0;width:100%}
-.codes{display:flex;gap:var(--space-2);width:100%;justify-content:center}
-.codes input{flex:1;min-width:0;max-width:var(--u-48);height:var(--u-48);padding:0;text-align:center;font-size:var(--fs-value);border:var(--hair) solid var(--ctrl-border);border-radius:var(--radius-control);background:var(--card);outline:0}
-.codes input:focus{box-shadow:0 0 0 var(--u-2) var(--accent);border-color:var(--accent)}
-.rs{min-height:var(--tap);display:inline-flex;align-items:center;padding:0 var(--space-4);border-radius:var(--radius-control);color:var(--accent-text);font-weight:600}
+.peek{flex:none;display:inline-flex;align-items:center;justify-content:center;width:var(--tap);height:var(--tap);margin-right:calc(var(--u-14) * -1);border-radius:var(--radius-control);color:var(--accent-text)}
+.peek .ic{width:var(--u-20);height:var(--u-20)}
+.st[hidden]{display:none}
+.lg-err{align-self:flex-start;text-align:left;font-weight:600}
+.pad2 .lg-err{margin:0}
 
 .pad #s-reports>.in{max-width:none;margin:0}
 .pad #s-reports>.in .seg{max-width:var(--u-420)}
