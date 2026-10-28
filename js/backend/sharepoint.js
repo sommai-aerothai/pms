@@ -9,5 +9,7 @@ export const listTemplates = nope;
 // TODO Graph: GET /drives/{id}/items/{itemId}/content  (ใช้ตอนกดเก็บ offline)
 export const getBlob = nope;
 // TODO Graph: List PMJobs (ขั้น 2)
-export const getJob = nope;
+export const listJobs = nope;
+export const getFiles = nope;
+export const genericJob = nope;
 export const getCatalog = nope;

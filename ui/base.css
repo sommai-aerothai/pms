@@ -198,10 +198,6 @@ td.bad::after{content:"⚠︎ เกินช่วง";display:block;text-align
 .pt2{padding-top:var(--space-2)}
 
 /* วันนี้ */
-.th{display:flex;align-items:center;justify-content:space-between;padding-right:var(--space-2)}
-.th h1.lt{margin-bottom:0}
-.avb{width:var(--tap);height:var(--tap);display:flex;align-items:center;justify-content:center;border-radius:var(--radius-control)}
-.avb span{width:var(--u-36);height:var(--u-36);border-radius:var(--radius-control);background:var(--accent);color:var(--accent-on-fill);display:flex;align-items:center;justify-content:center;font-weight:700}
 .today .note{margin:var(--space-1) var(--space-4) var(--space-5)}
 .today .grp{margin-bottom:var(--space-5)}
 .today .bar2{margin-bottom:var(--space-3)}
@@ -215,5 +211,9 @@ td.bad::after{content:"⚠︎ เกินช่วง";display:block;text-align
 .codes input:focus{box-shadow:0 0 0 var(--u-2) var(--accent);border-color:var(--accent)}
 .rs{min-height:var(--tap);display:inline-flex;align-items:center;padding:0 var(--space-4);border-radius:var(--radius-control);color:var(--accent-text);font-weight:600}
 
-.pad #s-docs>.in{max-width:none;margin:0}
-.pad #s-docs>.in .seg{max-width:var(--u-420)}
+.pad #s-reports>.in{max-width:none;margin:0}
+.pad #s-reports>.in .seg{max-width:var(--u-420)}
+.stl{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2)}
+.vbd{position:sticky;top:calc(var(--st) + var(--tap) + var(--space-2));z-index:3;height:0;text-align:center}
+[role=radio] .ck{color:var(--accent);visibility:hidden}[role=radio][aria-checked=true] .ck{visibility:visible}
+.search .cap{flex:none}
