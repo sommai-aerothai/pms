@@ -7,6 +7,7 @@ import { FM202_FIELDS } from '../data/wi-scope.js';
 import { fillXlsx } from './xlsx-fill.js';
 
 export const SHEETS = ['Page 1', 'Page 2'], FIRST = 9, PER_PAGE = 17, MAX = SHEETS.length * PER_PAGE;
+const str = v => String(v ?? '').trim();
 const val = v => { const s = String(v ?? '').trim(); return /^-?\d+(\.\d+)?$/.test(s) ? +s : s; };   // เก็บเป็นตัวเลขเมื่อเป็นตัวเลข
 
 // คืน { edits: {ชีต: {ช่อง: ค่า}}, pages, missing: [ข้อความ] } · missing = สิ่งที่วางไม่ได้/ไม่มีข้อมูล ให้ผู้ใช้เห็นก่อนส่ง
@@ -18,10 +19,12 @@ export function map202(job) {
     if (!Number.isInteger(t.n) || t.n < 1 || t.n > MAX) { missing.push(`Tx ${t.n} (${t.freq}): ฟอร์มมี ${MAX} แถว (2 หน้า × ${PER_PAGE}) · วางไม่ได้`); continue; }
     const p = Math.floor((t.n - 1) / PER_PAGE), r = FIRST + (t.n - 1) % PER_PAGE, v = t.v || {};
     pages = Math.max(pages, p + 1);
-    put(p, 'B' + r, val(t.freq)); put(p, 'E' + r, val(t.model)); put(p, 'G' + r, val(v.asset || t.reg)); put(p, 'H' + r, val(v.serial));
-    const empty = [];
+    // รหัสเครื่องเป็นข้อความเสมอ (กันเลข 0 นำหน้าหาย) · Asset = ค่าที่ตรวจจากสติกเกอร์เท่านั้น ไม่ใช้ทะเบียนแทน
+    put(p, 'B' + r, val(t.freq)); put(p, 'E' + r, str(t.model)); put(p, 'G' + r, str(v.asset)); put(p, 'H' + r, str(v.serial));
+    const empty = str(v.asset) ? [] : ['Asset No (ยังไม่ตรวจสติกเกอร์)'];
     for (const f of FM202_FIELDS) {
-      const x = val(v[f.k]);
+      let x = val(v[f.k]);
+      if (f.k === 'spur' && typeof x === 'number') x = Math.abs(x);   // แอปเก็บ −66 dBc · ฟอร์มที่ผู้ตรวจรับแล้วเขียนขนาด 66
       if (!f.col) { if (x !== '') missing.push(`Tx ${t.n}: ${f.n} = ${x} · ฟอร์มไม่มีช่อง (R = Squelch)`); continue; }
       if (x === '') empty.push(f.t); else put(p, f.col + r, x);
     }

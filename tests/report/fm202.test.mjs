@@ -36,7 +36,7 @@ let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.error('FAIL', m
 
 // งานสมมุติ: 21 เครื่อง (ข้ามไปหน้า 2) + 1 เครื่องเกินฟอร์ม · ค่าวัดปลอมสร้างจากสูตร ไม่ใช่ค่าจริง
 const tx = Array.from({ length: 21 }, (_, i) => ({ n: i + 1, freq: +(118 + i * 0.725).toFixed(3), model: 'DEMO-TX', reg: `TEST-${100 + i}`,
-  v: { serial: `SN-TEST-${i}`, err: String((i % 7) - 3.5), osc: '5.01', pow: String(15 + i / 10), spur: String(-61 - i), mod: '88.5', sens: '-104', dist: '1.2', tout: i === 4 ? '' : '180' } }));
+  v: { asset: i === 2 ? '' : `00${7000 + i}`, serial: `SN-TEST-${i}`, err: String((i % 7) - 3.5), osc: '5.01', pow: String(15 + i / 10), spur: String(-61 - i), mod: '88.5', sens: '-104', dist: '1.2', tout: i === 4 ? '' : '180' } }));
 tx.push({ n: 40, freq: 140, model: 'X', reg: 'X', v: {} });
 const job = { round: '9/99', pm: { base: 'DM TEST Radio (สถานีทดสอบ)', people: ['ทดสอบ หนึ่ง', 'ทดสอบ สอง'] }, tx };
 
@@ -48,7 +48,8 @@ ok(out.missing.some(s => s.startsWith('Tx 40')) && out.missing.some(s => s.start
 const back = await readXlsx(out.bytes), sh = Object.fromEntries(back.sheets.map(s => [s.name, s.cells]));
 let n = 0, bad = [];
 for (const [s, cells] of Object.entries(out.edits)) for (const [ref, v] of Object.entries(cells)) { n++; if (sh[s][ref] !== v) bad.push(`${s}!${ref}: ${sh[s][ref]} ≠ ${v}`); }
-ok(!bad.length && n === 21 * 11 - 1 + 4, `ค่า ${n} ช่องลงตรงตำแหน่ง ${bad.slice(0, 3).join(' | ')}`);
+ok(!bad.length && n === 21 * 11 - 2 + 4, `ค่า ${n} ช่องลงตรงตำแหน่ง ${bad.slice(0, 3).join(' | ')}`);
+ok(sh['Page 1'].O9 === 61 && sh['Page 1'].G9 === '007000' && sh['Page 1'].G11 === undefined && out.missing.some(s => s.startsWith('Tx 3 ') && /Asset/.test(s)), 'Spurious เขียนเป็นขนาดบวกตามฟอร์มจริง · Asset เป็นข้อความ (0 นำหน้าอยู่) · ไม่ตรวจ = ว่าง+รายงาน');
 ok(sh['Page 1'].I9 === -3.5 && sh['Page 1'].B25 === tx[16].freq && sh['Page 2'].B9 === tx[17].freq && sh['Page 2'].A9 === 18 && sh['Page 2'].M12 === 17, 'Tx 1-17 หน้า 1 · Tx 18-21 หน้า 2 แถว 9-12 (NO เดิมของฟอร์ม)');
 ok(sh['Page 1'].A4 === 'MaintID PM DM TEST Radio ครั้งที่ 9/99' && /^ผู้ปฏิบัติ\s+1\. ทดสอบ หนึ่ง\s+2\. ทดสอบ สอง$/.test(sh['Page 2'].A27), 'หัวฟอร์ม + ผู้ปฏิบัติ ทั้ง 2 หน้า (เลขอารบิก)');
 
