@@ -83,7 +83,7 @@ ok(na.code === 'auth' && hit === 0, 'ไม่มี session → auth (ไม่
     { id: 2, code: 'FM-CE.SE-001', title: 'FM-CE.SE-001 (ไฟล์แก้ได้ ไม่ได้ลิงก์บนหน้าเว็บ)', file: 'ExFM-CESE-001ทะเบียนอุปกรณ์.docx', storage_path: 'fm/001.docx' },
     { id: 3, code: 'FM-CE.SE-002', title: 'FM-CE.SE-002', file: 'ExFM-CESE-002ใบงาน.xlsx', storage_path: 'fm/002.xlsx' }] });
   ok(c.rows.length === 2 && c.total === 2 && c.rows[0].storagePath === 'fm/001.pdf' && c.rows[0].editable.storagePath === 'fm/001.docx' && c.rows[0].editable.bucket === 'docs' && !c.rows[1].editable, 'cat: PDF+docx ของเอกสารเดียวกัน → แถวเดียว ดูด้วย PDF · editable = ไฟล์แก้ได้ · จำนวนหมวดนับหลังรวม');
-  const c2 = sh.cat({ id: 'fm', total: 95, rows: [{ id: 1, code: 'A', title: 'ก', file: 'a.pdf' }, { id: 2, code: 'A', title: 'ก', file: 'a.doc' }] });
+  const c2 = sh.cat({ id: 'fm', total: 95, rows: [{ id: 1, code: 'A', title: 'ก', file: 'a.pdf', storage_path: 'a.pdf' }, { id: 2, code: 'A', title: 'ก', file: 'a.doc', storage_path: 'a.doc' }] });
   ok(c2.total === 94, 'cat: total จาก backend ลดตามจำนวนที่รวม');
   const rows = [{ people: ['สมหมาย'], id: 'a', ym: '2026-07' }, { people: ['วิชัย'], id: 'b', ym: '2026-07' }];
   ok(F.isMe('สมหมาย', 'สมหมาย นุ๊ก สาสังข์') && F.isMe('นุ๊ก', 'สมหมาย นุ๊ก สาสังข์') && F.isMe('สมหมาย นุ๊ก สาสังข์', 'สมหมาย นุ๊ก สาสังข์') && F.isMe('สมหมาย', 'สมหมาย') && !F.isMe('วิชัย', 'สมหมาย นุ๊ก สาสังข์') && !F.isMe('สาสังข์', 'สมหมาย นุ๊ก สาสังข์') && !F.isMe('', ''), 'isMe: ชื่อเต็ม/ชื่อต้น/ชื่อเล่นตรง · คนอื่นและนามสกุลไม่ตรง');
