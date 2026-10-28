@@ -367,6 +367,10 @@ document.addEventListener('click', e => {
     const on = t.getAttribute('aria-checked') !== 'true'; t.setAttribute('aria-checked', on); $('span', t).textContent = on ? 'เปิด' : 'ปิด';
     if (d.off) { store.setOffline(d.off, on); S.rev++; draw(); } else if (d.pref) store.pref(d.pref, on); 
   }
+  else if (d.dlEd) {   // ไฟล์แก้ได้ (Word/Excel) ของเอกสารที่รวมกับ PDF: ขอ signed URL ตอนกดแล้วดาวน์โหลด
+    const it = V.viewItem(S, d.dlEd);
+    store.fileUrl(it && it.editable).then(url => { if (!url) throw 0; const a = document.createElement('a'); a.href = url; a.download = ''; a.rel = 'noopener'; a.click(); }).catch(() => toast('ดาวน์โหลดไม่สำเร็จ ลองอีกครั้ง', 'warn'));
+  }
   else if (d.offAct) { closeSheet(); const on = !V.isOff(S, d.offAct); store.setOffline(d.offAct, on); S.rev++; draw(); toast(on ? 'เก็บไว้ดู offline แล้ว' : 'ลบออกจาก offline แล้ว', on ? 'dl' : 'trash'); }
   else if (d.pane) { $$('button', t.parentNode).forEach(b => b.setAttribute('aria-pressed', b === t)); $$(':scope > .pane', $('#' + d.pane).parentNode).forEach(p => { p.hidden = p.id !== d.pane; }); if (/^[pr]-/.test(d.pane)) S.ui[d.pane[0]] = d.pane; if (/^pm-/.test(d.pane)) { S.ui.pmt = d.pane; drawCta(); } }
   else if ('toast' in d) toast(d.toast);

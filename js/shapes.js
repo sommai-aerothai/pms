@@ -20,15 +20,43 @@ const pick = (...v) => { const x = v.slice(0, -1).find(y => y !== undefined && y
 // เอกสารเว็บกอง (documents) — ช่องที่ UI อ่าน:
 // id (string ไม่ซ้ำในหมวดเอกสาร) · code ('' ได้) · rev · title · name (= title) · tag · kind · cat (id หมวด) · sourceUrl (http(s) หรือ '')
 // storagePath (path ใน bucket 'docs' หรือ null = ยังไม่มีไฟล์ในระบบ) · bucket ('docs') · pages (null = ไม่รู้ ห้ามเดา) · size · sha256 · fetchedAt (ISO หรือ null) · offline (ค่าเริ่ม ตั้งเก็บ offline)
+// ชื่อเอกสาร: ฐานจริงเก็บ title = รหัส (บางแถวต่อท้ายหมายเหตุ "(ไฟล์แก้ได้…)") → ถ้า title ไม่มีชื่อ ดึงจากชื่อไฟล์ (ตัดนามสกุล · รหัสนำหน้า เช่น ExFM-CESE-001 / SD-CE.SE-86 / WI-CESE-02 · Rev.xx) · Rev อ่านจาก title/ไฟล์เมื่อฐานไม่มี
+const REV_RE = /[\s_(\-]*Rev\.?\s*(\d+)\)?/i, CODE_PFX = /^(?:Ex)?(?:FM|WI|QP|QM|SD)[-_. ]*(?:CE\.?SE)?[-_. ]*\d+/i;
+const tidy = t => t.replace(/[_\s]+/g, ' ').replace(/^[\s\-–.:()]+|[\s\-–.:(]+$/g, '').trim();
+const extOf = f => (/\.([A-Za-z0-9]+)$/.exec(f || '') || [])[1]?.toLowerCase() || '';
+const nameOf = (title, code, file) => {
+  const clean = t => tidy(t.replace(/\([^)]*ไฟล์แก้ได้[^)]*\)/g, '').replace(REV_RE, ' ').replace(code ? new RegExp('^' + code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[\\s\\-–:]*', 'i') : /$^/, ''));
+  const t = clean(String(title || '')); if (t && t !== code) return t;
+  const f = String(file || '').split('/').pop().replace(/\.[A-Za-z0-9]+$/, '');
+  return tidy(f.replace(REV_RE, ' ').replace(CODE_PFX, ''));
+};
 export const doc = r => {
-  const title = pick(r.title, r.name, '');
-  return { ...r, schema: 1, id: String(pick(r.id, r.code, '')), code: r.code || '', rev: r.rev || '', title, name: pick(r.name, title), tag: r.tag || '', kind: r.kind, cat: r.cat || catOf(r.kind),
+  const file = pick(r.file, r.file_name, ''), code = r.code || '', raw = pick(r.title, r.name, ''), title = nameOf(raw, code, file) || (code ? '' : String(raw));
+  const rev = r.rev || (REV_RE.exec(`${raw} ${file}`) || [])[1] || '';
+  return { ...r, schema: 1, id: String(pick(r.id, r.code, '')), code, rev, title, name: title, tag: r.tag || '', kind: r.kind, cat: r.cat || catOf(r.kind), file,
     sourceUrl: httpUrl(pick(r.sourceUrl, r.source_url)), storagePath: pick(r.storagePath, r.storage_path, null), bucket: 'docs', pages: pick(r.pages, null), size: pick(r.size, null), sha256: r.sha256 || '', fetchedAt: pick(r.fetchedAt, r.fetched_at, null), offline: r.offline ?? false };
+};
+// รวมไฟล์ชุดเดียวกัน (รหัส+ชื่อเดียวกัน) ที่มีทั้ง PDF และไฟล์แก้ได้ (doc/docx/xlsx) เป็นแถวเดียว: ดูด้วย PDF · ไฟล์แก้ได้เก็บที่ editable = { id, file, storagePath, bucket, size, sourceUrl }
+const isPdf = d => extOf(d.file || d.storagePath) === 'pdf';
+export const mergeFormats = rows => {
+  const by = new Map(), out = [];
+  for (const d of rows) {
+    const k = d.code && d.title ? `${d.code}|${d.title}`.toLowerCase() : '', g = k && by.get(k);
+    if (!g) { const x = { ...d }; out.push(x); if (k) by.set(k, x); continue; }
+    const [pdf, other] = isPdf(g) && !isPdf(d) ? [g, d] : !isPdf(g) && isPdf(d) && !g.editable ? [d, g] : [null, null];
+    if (!pdf || pdf.editable || !other.storagePath || (g.rev && d.rev && g.rev !== d.rev)) { out.push({ ...d }); continue; }   // ไม่รวมถ้าไฟล์แก้ได้ไม่มีในระบบ (เหลือแต่ลิงก์เว็บ) หรือคนละ Rev
+    const ed = { id: other.id, file: other.file, storagePath: other.storagePath, bucket: other.bucket, size: other.size, sourceUrl: other.sourceUrl };
+    if (pdf === g) g.editable = ed; else { Object.assign(out[out.indexOf(g)], { ...d, editable: ed }); }
+  }
+  return out;
 };
 // ฟอร์ม/WI ล่าสุด (templates) = doc + ค้นด้วย code · isNew/prev/changed (เตือน Rev ใหม่) มีเฉพาะเมื่อ backend ส่งมา
 export const template = r => { const d = doc(r); return { ...d, id: d.code || d.id }; };
 // หมวดในหน้าเอกสาร: { id, name, total (จำนวนจริงในหมวด), rows: doc[] }
-export const cat = c => ({ id: c.id, name: CAT_NAME[c.id] || c.name || c.id, total: pick(c.total, (c.rows || []).length), rows: (c.rows || []).map(x => doc({ ...x, cat: c.id })) });
+export const cat = c => {   // total ที่ backend ให้ (ทั้งหมวดในฐาน) ลดตามจำนวนแถวที่รวมแล้ว
+  const all = (c.rows || []).map(x => doc({ ...x, cat: c.id })), rows = mergeFormats(all);
+  return { id: c.id, name: CAT_NAME[c.id] || c.name || c.id, total: pick(c.total, all.length) - (all.length - rows.length), rows };
+};
 export const groupDocs = rows => { const by = {}; rows.map(doc).forEach(d => (by[d.cat] ||= []).push(d)); return Object.entries(by).map(([id, L]) => cat({ id, total: L.length, rows: L })); };
 
 // ตัวอย่างรายงาน (examples) — ช่องที่ UI อ่าน:
