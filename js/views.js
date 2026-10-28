@@ -203,7 +203,7 @@ export function folder(S, _, back) {
 export function me(S) {
   const r = (i, t, s) => `<button class="row" data-toast="โหมดตัวอย่าง · ยังไม่เปิดใช้">${ic(i, 'lead')}<span class="rt"><span>${t}</span><span class="sub">${s}</span></span>${chev}</button>`, auto = store.pref('auto') !== false;
   return `${nav('ฉัน')}<div class="in"><h1 class="lt">ฉัน</h1><div class="hero"><div class="avatar">${esc([...S.user.name][0])}</div><div class="big">${esc(S.user.name)}</div><div class="sec">${esc(S.user.email || 'CE.SE · AEROTHAI')}</div></div>
- <div class="grp">${r('ok', 'บัญชีบริษัท', store.backendName() === 'demo' ? 'โหมดตัวอย่าง · ยังไม่เชื่อมต่อ' : S.user.email || '')}${r('sig', 'ลายเซ็นของฉัน', 'ใช้ตอนออกรายงาน')}${r('gear', 'ตั้งค่า', 'แจ้งเตือนรอบ PM · calibration')}</div>
+ <div class="grp">${r('ok', 'บัญชีบริษัท', store.backendName() === 'demo' ? 'โหมดตัวอย่าง · ยังไม่เชื่อมต่อ' : S.user.email || '')}${store.backendName() === 'demo' ? '' : `<button class="row" data-sheet="pw">${ic('lock', 'lead')}<span class="rt"><span>เปลี่ยนรหัสผ่าน</span></span>${chev}</button>`}${r('sig', 'ลายเซ็นของฉัน', 'ใช้ตอนออกรายงาน')}${r('gear', 'ตั้งค่า', 'แจ้งเตือนรอบ PM · calibration')}</div>
  <div class="sh">เชื่อมต่อ</div><div class="grp"><div class="kv"><span>เซิร์ฟเวอร์: ${store.backendName() === 'demo' ? 'ตัวอย่าง (demo)' : 'Supabase'}</span><button class="btn alt" data-be="${store.backendName() === 'demo' ? 'supabase' : 'demo'}">สลับเป็น ${store.backendName() === 'demo' ? 'Supabase' : 'demo'}</button></div></div>
  <div class="sh">พื้นที่ offline</div><div class="grp"><div class="kv"><span>ตั้งเก็บ offline อัตโนมัติ · ตัวอย่าง (ยังไม่โหลดไฟล์จริง)</span>${sw(auto, 'data-pref="auto" aria-label="ตั้งเก็บ offline อัตโนมัติ (ตัวอย่าง)"')}</div><div class="kv"><span>ตั้งไว้ในเครื่อง</span><span>${store.offlineCount()} รายการ</span></div></div>
  <div class="grp">${r('info', 'เกี่ยวกับ / เวอร์ชัน', `${S.version} (${store.backendName()})`)}</div>
@@ -219,6 +219,11 @@ export function sheet(S, kind, id) {
  <div class="sh">ครั้งที่</div><label class="search"><input id="nrd" value="3/69" inputmode="text" autocomplete="off" aria-label="ครั้งที่"></label>
  <div class="sh">ช่วงวันที่ปฏิบัติงาน</div><label class="search"><span class="cap">เริ่ม</span><input type="date" id="nd1" value="${t}" aria-label="วันเริ่ม"></label><label class="search"><span class="cap">สิ้นสุด</span><input type="date" id="nd2" value="${e}" aria-label="วันสิ้นสุด"></label>
  <div class="pad2"><button class="btn" data-create>สร้างงาน</button></div>`);
+  }
+  if (kind === 'pw') {
+    const f = (id, l) => `<label class="search"><input type="password" id="${id}" autocomplete="new-password" placeholder="${l}" aria-label="${l}"><button class="peek" type="button" data-peek aria-label="Show password" aria-pressed="false">${ic('eye')}</button></label>`;
+    return h('เปลี่ยนรหัสผ่าน', `<p class="sec note">อย่างน้อย 8 ตัวอักษร</p>${f('pw1', 'รหัสผ่านใหม่')}${f('pw2', 'ยืนยันรหัสผ่านใหม่')}
+ <div class="pad2"><p class="st w lg-err" id="pwErr" role="alert" hidden>${ic('warn')}<span></span></p><button class="btn" data-pw-save>บันทึก</button></div>`);
   }
   if (kind === 'ready') {
     const j = S.job, miss = j.forms.length - formsDone(j);

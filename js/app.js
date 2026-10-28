@@ -6,7 +6,7 @@ import * as photos from './photos.js';
 import { tok } from './tok.js';
 import { CONFIG } from './config.js';
 
-const VERSION = 'v0.4';
+const VERSION = 'v0.5';
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const app = $('#app'), TABS = ['today', 'pm', 'reports', 'docs', 'me'];
 const TITLES = { today: 'วันนี้', pm: 'งาน PM', reports: 'รายงาน', docs: 'เอกสาร', me: 'ฉัน' };
@@ -24,7 +24,7 @@ const photoIds = () => S.jobs.flatMap(j => [...(j.tx || []).flatMap(t => Object.
 async function loadPhotos() {
   for (const id of photoIds()) if (!S.ph[id]) { try { const b = await photos.get(id); if (b) S.ph[id] = URL.createObjectURL(b); } catch { /* IndexedDB ใช้ไม่ได้ → ไม่มี thumbnail */ } }
 }
-const errWord = e => ({ auth: 'ต้องเข้าสู่ระบบใหม่', server: 'เซิร์ฟเวอร์มีปัญหา ลองใหม่อีกครั้ง', conflict: 'มีคนแก้งานนี้ก่อน โหลดใหม่แล้วลองอีกครั้ง', offline: 'ออฟไลน์อยู่', notfound: 'ไม่พบข้อมูล', throttled: 'ระบบยุ่ง ลองใหม่อีกครั้ง' }[e.code] || 'เกิดข้อผิดพลาด');
+const errWord = e => ({ auth: 'ต้องเข้าสู่ระบบใหม่', server: 'เซิร์ฟเวอร์มีปัญหา ลองใหม่อีกครั้ง', conflict: 'มีคนแก้งานนี้ก่อน โหลดใหม่แล้วลองอีกครั้ง', offline: 'ออฟไลน์อยู่', invalid: 'ข้อมูลไม่ถูกต้อง', notfound: 'ไม่พบข้อมูล', throttled: 'ระบบยุ่ง ลองใหม่อีกครั้ง' }[e.code] || 'เกิดข้อผิดพลาด');
 async function refresh() {
   try { [S.docs, S.templates, S.cats] = [(await store.listDocs()).items, await store.listTemplates(), await store.getFiles()]; S.files = S.cats.flatMap(c => c.rows); S.rev++; draw(); toast('รีเฟรชแล้ว', 'ok'); }
   catch (e) { toast(errWord(e), 'warn'); }
@@ -186,13 +186,14 @@ async function createJob() {
 
 // ---------- เหตุการณ์ ----------
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-start],[data-sys],[data-create],[data-share],[data-resend],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],#bd');
+  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-start],[data-sys],[data-create],[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],#bd');
   if (!t) return; const d = t.dataset;
   if (d.pre) { const [k, v] = d.pre.split(':'); if (k === 'cur') { const jb = S.jobs.find(x => x.id === d.pre.split(':')[2]); if (jb) { jb.cur = +v; if (jb === S.job) sched(); else store.putJob(jb); } } else S.ui[k] = v; S.rev++; }
   if (d.start) { const jb = S.jobs.find(x => x.id === d.start); jb.status = 'doing'; jb.touched = new Date().toISOString(); store.putJob(jb); S.rev++; draw(); toast('เริ่มงานแล้ว', 'ok'); }
   else if (d.sys) { $$('[data-sys]').forEach(b => b.setAttribute('aria-checked', b === t)); }
   else if ('create' in d) createJob();
-  else if ('resend' in d) { e.preventDefault(); if (real() && !notReady()) store.auth().requestOtp($('#email').value.trim()).then(() => toast('ส่งรหัสอีกครั้งแล้ว', 'ok'), x => toast(errWord(x), 'warn')); else toast(notReady() ? 'ยังไม่ได้ตั้งค่าเซิร์ฟเวอร์' : 'Code sent again (demo)', notReady() ? 'warn' : 'ok'); }
+  else if ('peek' in d) { const i = $('input', t.parentNode), on = i.type === 'password'; i.type = on ? 'text' : 'password'; t.setAttribute('aria-pressed', on); t.setAttribute('aria-label', on ? 'Hide password' : 'Show password'); $('use', t).setAttribute('href', `./ui/icons.svg#i-${on ? 'eyeoff' : 'eye'}`); }
+  else if ('pwSave' in d) savePassword();
   else if ('recheck' in d) finishLogin(true);
   else if (d.be) { store.setBackend(d.be); store.pref('user', null); location.reload(); }   // เปลี่ยน backend = ล็อกอินใหม่
   else if ('back' in d) { e.preventDefault(); pop(); }
@@ -253,29 +254,27 @@ app.addEventListener('scroll', e => {
   if (!long || y <= tok('slop') || sa < -tok('slop')) mini.remove('mini'); else if (sa > tok('dock-shrink')) mini.add('mini');
 }, true);
 
-// ---------- ล็อกอิน (อังกฤษ · ตัวอย่าง): อีเมลบริษัท → รหัส 6 หลัก · demo รับเลข 6 หลักอะไรก็ได้ ----------
-const boxes = () => $$('#codeBoxes input');
+// ---------- ล็อกอิน (อังกฤษ): ชื่อผู้ใช้ (อีเมล) + รหัสผ่าน · demo รับอะไรก็ได้ ----------
 const real = () => store.backendName() !== 'demo';
 const notReady = () => real() && !(CONFIG.supabaseUrl && CONFIG.anonKey);
-async function sendCode() {
-  const m = $('#email'); if (!m.value.trim() || !m.checkValidity()) { m.reportValidity(); return; }
-  if (notReady()) return toast('ยังไม่ได้ตั้งค่าเซิร์ฟเวอร์', 'warn');
-  if (real()) { try { await store.auth().requestOtp(m.value.trim()); } catch (e) { return toast(errWord(e), 'warn'); } }
-  $('#s-login').classList.add('code'); $('#sentTo').textContent = m.value.trim(); boxes()[0].focus();
-}
+const LOGIN_ERR = { auth: 'Wrong username or password', offline: 'No connection', server: 'Server not configured' };
+const loginErr = t => { const x = $('#lgErr'); x.hidden = !t; $('span', x).textContent = t || ''; };
 let busy = false;
 async function finishLogin(recheck = false) {
-  if (busy) return; busy = true;
+  if (busy) return; busy = true; loginErr('');
   try {
     let u = { name: 'สมหมาย', email: $('#email').value.trim() };
     if (real()) {
+      if (notReady()) return loginErr(LOGIN_ERR.server);
+      const em = $('#email').value.trim(), pw = $('#pass').value;
+      if (!recheck && (!em || !pw)) return loginErr(LOGIN_ERR.auth);
       try {
-        const em = $('#email').value.trim(), a = store.auth();
-        if (!recheck) await a.verifyOtp(em, boxes().map(x => x.value).join(''));
+        const a = store.auth();
+        if (!recheck) await a.signIn(em, pw);
         const p = await a.me(); $('#s-login').classList.toggle('wait', !p.approved);
         if (!p.approved) return;
         u = { name: p.name || p.email, email: p.email }; await load();
-      } catch (e) { boxes().forEach(x => { x.value = ''; }); boxes()[0].focus(); return toast(e.code === 'auth' ? 'รหัสไม่ถูกหรือหมดอายุ' : errWord(e), 'warn'); }
+      } catch (e) { $('#pass').value = ''; return loginErr(e.code === 'auth' ? LOGIN_ERR.auth : e.code === 'offline' ? LOGIN_ERR.offline : 'Something went wrong. Try again.'); }
     }
     enter(u);
   } finally { busy = false; }
@@ -283,18 +282,17 @@ async function finishLogin(recheck = false) {
 function enter(u) {
   store.pref('user', u); S.user = u; app.classList.remove('login'); S.rev++; location.hash.length > 2 ? draw() : go('#/today');
 }
-// ใส่ตัวเลขหลายตัวตั้งแต่ช่อง n (วาง / autofill "จากข้อความ") → ช่องถัดไปที่ว่าง หรือส่งเมื่อครบ 6
-function fillCode(d, n) {
-  const b = boxes(); d.split('').slice(0, 6 - n).forEach((c, k) => { b[n + k].value = c; });
-  const e = b.find(x => !x.value); if (e) e.focus(); else finishLogin();
+$('#loginForm').addEventListener('submit', e => { e.preventDefault(); finishLogin(); });
+
+// เปลี่ยนรหัสผ่าน (sheet จาก views.js · เฉพาะ backend จริง)
+async function savePassword() {
+  const a = $('#pw1').value, b = $('#pw2').value, x = $('#pwErr'), say = t => { x.hidden = !t; $('span', x).textContent = t || ''; };
+  if (a.length < 8) return say('รหัสผ่านต้องยาวอย่างน้อย 8 ตัว');
+  if (a !== b) return say('รหัสผ่านสองช่องไม่ตรงกัน');
+  say('');
+  try { await store.auth().changePassword(a); } catch (e) { return say(e.code === 'invalid' ? 'รหัสผ่านนี้ใช้ไม่ได้ ลองตั้งใหม่' : errWord(e)); }
+  closeSheet(); toast('เปลี่ยนรหัสผ่านแล้ว', 'ok');
 }
-$('#codeBoxes').addEventListener('input', e => {
-  const i = e.target, b = boxes(), n = b.indexOf(i), d = i.value.replace(/\D/g, '');
-  if (d.length > 1) fillCode(d, n); else { i.value = d; if (d && b[n + 1]) b[n + 1].focus(); if (b.every(x => x.value)) finishLogin(); }
-});
-$('#codeBoxes').addEventListener('paste', e => { e.preventDefault(); fillCode((e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6), boxes().indexOf(e.target)); });
-$('#codeBoxes').addEventListener('keydown', e => { const b = boxes(), n = b.indexOf(e.target); if (e.key === 'Backspace' && !e.target.value && b[n - 1]) b[n - 1].focus(); });
-$('#emailForm').addEventListener('submit', e => { e.preventDefault(); sendCode(); });
 
 // ---------- เริ่มทำงาน ----------
 function themeColor() { $('meta[name=theme-color]').content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(); }
