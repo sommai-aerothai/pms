@@ -6,6 +6,9 @@
 import { FM202_FIELDS } from '../data/wi-scope.js';
 import { fillXlsx } from './xlsx-fill.js';
 
+// รูปแบบแสดงเลขต่อคอลัมน์ ตามฉบับที่ผู้ตรวจรับแล้ว (2-69 Page 1): B 0.000 · I/M/P 0.0 · T 0.00 · ที่เหลือ General ตามฟอร์มเปล่า
+// (2-69 Page 2 ใช้ General ที่ P/T = ไม่สม่ำเสมอ → ใช้แบบ Page 1 ทั้งสองหน้า)
+export const FMT = { B: '0.000', I: '0.0', M: '0.0', P: '0.0', T: '0.00' };
 export const SHEETS = ['Page 1', 'Page 2'], FIRST = 9, PER_PAGE = 17, MAX = SHEETS.length * PER_PAGE;
 const str = v => String(v ?? '').trim();
 const val = v => { const s = String(v ?? '').trim(); return /^-?\d+(\.\d+)?$/.test(s) ? +s : s; };   // เก็บเป็นตัวเลขเมื่อเป็นตัวเลข
@@ -13,7 +16,7 @@ const val = v => { const s = String(v ?? '').trim(); return /^-?\d+(\.\d+)?$/.te
 // คืน { edits: {ชีต: {ช่อง: ค่า}}, pages, missing: [ข้อความ] } · missing = สิ่งที่วางไม่ได้/ไม่มีข้อมูล ให้ผู้ใช้เห็นก่อนส่ง
 export function map202(job) {
   const edits = {}, missing = [], tx = [...(job.tx || [])].sort((a, b) => a.n - b.n);
-  const put = (n, ref, v) => { if (v !== '' && v != null) (edits[SHEETS[n]] ||= {})[ref] = v; };
+  const put = (n, ref, v) => { if (v === '' || v == null) return; const f = FMT[ref.replace(/\d+/, '')]; (edits[SHEETS[n]] ||= {})[ref] = f && typeof v === 'number' ? { v, fmt: f } : v; };
   let pages = 1;
   for (const t of tx) {
     if (!Number.isInteger(t.n) || t.n < 1 || t.n > MAX) { missing.push(`Tx ${t.n} (${t.freq}): ฟอร์มมี ${MAX} แถว (2 หน้า × ${PER_PAGE}) · วางไม่ได้`); continue; }

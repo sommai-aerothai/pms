@@ -1,5 +1,6 @@
 // เติมค่าลงสำเนา xlsx ของฟอร์มจริง · แก้เฉพาะ <c> ที่ระบุ (คง s= เดิม) ส่วนอื่นของไฟล์คงเดิมทุกไบต์ · ไม่ใช้ไลบรารี
-// edits = { 'Page 1': { A4: 'ข้อความ', I9: -2.1 } } · ค่า number → <v> · string → inlineStr · '' / null = ไม่แตะ
+// edits = { 'Page 1': { A4: 'ข้อความ', I9: -2.1, B9: { v: 118.1, fmt: '0.000' } } } · ค่า number → <v> · string → inlineStr · '' / null = ไม่แตะ
+// fmt = รูปแบบแสดงเลขของช่องนั้น: โคลน <xf> เดิมของช่องเป็นสไตล์ใหม่ที่ต่างแค่ numFmtId (โคลนเดียวกันใช้ซ้ำ) · ช่องอื่นไม่แตะ
 import { unzip } from '../readers/zip.js';
 
 const enc = new TextEncoder(), dec = new TextDecoder();
@@ -17,10 +18,10 @@ function sheetPaths(wb, rels) {
 }
 
 // แทน 1 cell · ต้องมี cell นี้ในฟอร์มอยู่แล้ว (ไม่มี = โครงฟอร์มเปลี่ยน → โยน error ไม่สร้างเอง)
-export function setCell(xml, ref, val) {
-  const re = new RegExp(`<c r="${ref}"(?=[\\s/>])([^>]*?)(?:/>|>[\\s\\S]*?</c>)`), m = re.exec(xml);
-  if (!m) throw new Error(`ไม่พบช่อง ${ref} ในฟอร์ม`);
-  const s = /\bs="(\d+)"/.exec(m[1]), sa = s ? ` s="${s[1]}"` : '';
+const cellAt = (xml, ref) => { const m = new RegExp(`<c r="${ref}"(?=[\\s/>])([^>]*?)(?:/>|>[\\s\\S]*?</c>)`).exec(xml); if (!m) throw new Error(`ไม่พบช่อง ${ref} ในฟอร์ม`); return m; };
+export const styleOf = (xml, ref) => +((/\bs="(\d+)"/.exec(cellAt(xml, ref)[1]) || [])[1] || 0);
+export function setCell(xml, ref, val, style) {
+  const m = cellAt(xml, ref), s = style ?? styleOf(xml, ref), sa = s ? ` s="${s}"` : '';
   const cell = typeof val === 'number'
     ? `<c r="${ref}"${sa}><v>${val}</v></c>`
     : `<c r="${ref}"${sa} t="inlineStr"><is><t xml:space="preserve">${esc(val)}</t></is></c>`;
@@ -31,17 +32,37 @@ export async function fillXlsx(buf, edits) {
   const z = await unzip(buf), files = new Map();
   for (const n of z.names) files.set(n, await z.read(n));
   const txt = n => dec.decode(files.get(n)), paths = sheetPaths(txt('xl/workbook.xml'), txt('xl/_rels/workbook.xml.rels'));
-  let formulas = false;
+  let formulas = false, styles = txt('xl/styles.xml'), clones = 0;
+  const BUILTIN = { 'General': 0, '0': 1, '0.00': 2 }, made = {};
+  const fmtStyle = (s, code) => {   // สไตล์ s + รูปแบบเลข code → index ของ xf (โคลนใหม่เมื่อจำเป็น)
+    const k = s + '|' + code; if (k in made) return made[k];
+    const xfs = /<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(styles), list = xfs[1].match(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g), xf = list[s]; if (!xf) throw new Error(`ไม่พบสไตล์ ${s} ในฟอร์ม`);
+    const have = [...styles.matchAll(/<numFmt numFmtId="(\d+)" formatCode="([^"]*)"/g)].find(m => m[2] === esc(code));
+    let id = BUILTIN[code] ?? (have ? +have[1] : -1);
+    if (id < 0) {
+      id = Math.max(163, ...[...styles.matchAll(/<numFmt numFmtId="(\d+)"/g)].map(m => +m[1])) + 1;
+      const nf = `<numFmt numFmtId="${id}" formatCode="${esc(code)}"/>`;
+      styles = /<numFmts\b/.test(styles) ? styles.replace(/<numFmts count="(\d+)">/, (_, c) => `<numFmts count="${+c + 1}">`).replace('</numFmts>', nf + '</numFmts>')
+        : styles.replace(/(<styleSheet\b[^>]*>)/, `$1<numFmts count="1">${nf}</numFmts>`);
+    }
+    if (+((/numFmtId="(\d+)"/.exec(xf) || [])[1] || 0) === id) return made[k] = s;   // รูปแบบตรงอยู่แล้ว
+    let c = xf.replace(/numFmtId="\d+"/, `numFmtId="${id}"`); if (!/numFmtId=/.test(c)) c = c.replace('<xf ', `<xf numFmtId="${id}" `);
+    c = /applyNumberFormat=/.test(c) ? c.replace(/applyNumberFormat="\d"/, 'applyNumberFormat="1"') : c.replace(/^(<xf\b[^>]*?)(\/?>)/, '$1 applyNumberFormat="1"$2');
+    styles = styles.replace(/<cellXfs count="(\d+)">([\s\S]*?)<\/cellXfs>/, (_, n, body) => `<cellXfs count="${+n + 1}">${body}${c}</cellXfs>`);
+    clones++; return made[k] = list.length;
+  };
   for (const [sheet, cells] of Object.entries(edits)) {
     const p = paths[sheet]; if (!p || !files.has(p)) throw new Error(`ไม่พบชีต "${sheet}" ในฟอร์ม`);
     let x = txt(p);
-    for (const [ref, v] of Object.entries(cells)) {
+    for (const [ref, e] of Object.entries(cells)) {
+      const v = e && typeof e === 'object' ? e.v : e, fmt = e && typeof e === 'object' && typeof v === 'number' ? e.fmt : null;
       if (v == null || v === '') continue;
       if (typeof v === 'number' && !Number.isFinite(v)) throw new Error(`ค่า ${ref} ไม่ใช่ตัวเลข`);
-      x = setCell(x, ref, v);
+      x = setCell(x, ref, v, fmt ? fmtStyle(styleOf(x, ref), fmt) : undefined);
     }
     files.set(p, enc.encode(x));
   }
+  if (clones) files.set('xl/styles.xml', enc.encode(styles));
   for (const p of Object.values(paths)) if (/<f[\s>]/.test(txt(p))) formulas = true;
   if (formulas) {   // มีสูตร: ทิ้ง calcChain ให้ Excel/LO คำนวณใหม่ตอนเปิด
     files.delete('xl/calcChain.xml');
