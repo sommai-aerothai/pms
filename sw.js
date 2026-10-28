@@ -1,5 +1,5 @@
 // cache-first สำหรับไฟล์แอป · network-first สำหรับข้อมูล (/api/ /data/) · เปลี่ยน VERSION ทุกครั้งที่แก้ไฟล์
-const VERSION = 'pms-v0.9.2', VENDOR = 'pms-vendor-v1';   // vendor/ (pdf.js · tesseract · ภาษา OCR) ใหญ่: โหลดครั้งแรกตอนใช้ แล้วเก็บ cache ถาวรให้ใช้ offline
+const VERSION = 'pms-v0.9.3', VENDOR = 'pms-vendor-v1';   // vendor/ (pdf.js · tesseract · ภาษา OCR) ใหญ่: โหลดครั้งแรกตอนใช้ แล้วเก็บ cache ถาวรให้ใช้ offline
 const FILES = ['./', './index.html', './manifest.webmanifest', './ui/tokens.css', './ui/base.css', './ui/icons.svg',
   './js/app.js', './js/views.js', './js/gestures.js', './js/store.js', './js/photos.js', './js/tok.js', './js/motion.js', './js/config.js', './js/import-sarabun.js', './js/flow.js', './js/shapes.js', './js/files.js', './js/data/schedule-2569.js', './js/data/wi-scope.js', './bookmarklet/sarabun-to-pms.js', './js/backend/supabase.js', './js/backend/demo.js', './js/backend/sharepoint.js',
   './icons/icon.svg', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png'];
