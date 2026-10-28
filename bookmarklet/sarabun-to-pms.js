@@ -1,3 +1,4 @@
+// ตัวอ่านเดียวของ 2 ทาง: บุ๊กมาร์กเล็ต "ส่งเข้า PMS" และคำสั่งลัด Apple Shortcuts (shortcuts/build.py ฝังไฟล์นี้ใน "Run JavaScript on Web Page" · มี completion() = โหมดคำสั่งลัด)
 // บุ๊กมาร์กเล็ต "ส่งเข้า PMS" — รันบนหน้า "พิมพ์บันทึกงาน" ของสารบรรณ (printactionmsg.aspx)
 // อ่านหน้า → JSON → เปิดแอป PMS แล้วส่งด้วย postMessage (สำรอง: URL fragment) · ไม่แตะรหัสผ่าน/คุกกี้ · ไม่ส่งผ่านเซิร์ฟเวอร์ใคร
 // กฎการเขียน (หน้าติดตั้งย่อไฟล์นี้เป็นบรรทัดเดียวด้วยการตัดบรรทัดคอมเมนต์เต็มบรรทัด + ต่อบรรทัดด้วยช่องว่าง):
@@ -5,7 +6,7 @@
 (function () {
   // ที่อยู่แอป PMS (หน้าติดตั้งแทนค่านี้ให้ตรงกับที่ผู้ใช้เปิดอยู่ เช่น /pms/ หรือ /pms/preview/)
   var APP = 'https://sommai-aerothai.github.io/pms/';
-  var WAIT_MS = 10000, MAX_PDF = 3, MAX_PDF_BYTES = 10485760;
+  var WAIT_MS = 10000, SHORTCUT_MAX = 8000, MAX_PDF = 3, MAX_PDF_BYTES = 10485760;
   var LABELS = { 'วันที่พิมพ์': 'printedAt', 'เลขทะเบียน': 'regNo', 'ประเภทเอกสาร': 'docType', 'เลขที่เอกสารที่': 'docNo', 'สถานะ': 'status', 'ลงวันที่': 'docDate', 'อ้างถึง': 'ref', 'จาก': 'from', 'ถึง': 'to', 'เรื่อง': 'subject' };
   var TH = '๐๑๒๓๔๕๖๗๘๙';
   var HEAD = /^วันที่\s+([0-9๐-๙]{1,2}\/[0-9๐-๙]{1,2}\/[0-9๐-๙]{4})\s+([0-9๐-๙]{1,2}:[0-9๐-๙]{2}:[0-9๐-๙]{2})\s+(.*)$/;
@@ -95,6 +96,26 @@
     for (i = 0; i < b.length; i++) r += String.fromCharCode(b[i]);
     return btoa(r).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
+  // ลิงก์ APP#/import?d=… · เกิน max ตัวอักษร: ลดทีละขั้น (ตัดข้อความบันทึกงาน/หมายเหตุ → เหลือ 10/5/2/0 รายการ → ตัดช่องยาวให้สั้นลง) แล้วใส่ trimmed:true ให้หน้านำเข้าแจ้งผู้ใช้
+  // approved คำนวณจากข้อความเต็มก่อนตัดเสมอ (แอปใช้ตัดสินว่า FM-040 อนุมัติแล้ว) · ลดจนสุดแล้วยังไม่พอ = ลิงก์สั้น #/import?e=too-big
+  function link(d, max) {
+    var t = JSON.parse(JSON.stringify(d)), e = b64url(JSON.stringify(t)), steps, k;
+    function fits() { e = b64url(JSON.stringify(t)); return e.length <= max; }
+    function cap(o, keys, n) { keys.forEach(function (x) { if (typeof o[x] === 'string') o[x] = o[x].slice(0, n); }); }
+    t.approved = d.entries.some(function (x) { return /อนุมัติ/.test(x.note); });
+    if (!fits()) {
+      t.trimmed = true;
+      t.entries.forEach(function (x) { x.note = ''; x.remark = ''; });
+      steps = [10, 5, 2, 0];
+      for (k = 0; k < steps.length && !fits(); k++) t.entries = t.entries.slice(0, steps[k]);
+      if (!fits()) {
+        cap(t, ['url', 'ref', 'from', 'to', 'subject', 'docType', 'docNo', 'status'], 200);
+        t.entries.forEach(function (x) { cap(x, ['unit', 'name', 'presenter'], 60); });
+      }
+      if (!fits()) return APP + '\x23/import?e=too-big';
+    }
+    return APP + '\x23/import?d=' + e;
+  }
   // PDF: ดึงเฉพาะลิงก์ออริจินเดียวกับหน้านี้ (ใช้คุกกี้ล็อกอินของผู้ใช้เอง) · พลาดข้อไหนข้ามเงียบ ๆ
   function pdfs(links) {
     return Promise.all(links.filter(function (u) { try { return new URL(u).origin === location.origin; } catch (e) { return false; } }).slice(0, MAX_PDF).map(function (u) {
@@ -111,7 +132,7 @@
       if (done) return;
       done = true;
       try { if (w) w.close(); } catch (e) { }
-      location.href = APP + '\x23/import?d=' + b64url(JSON.stringify(d));
+      location.href = link(d, Infinity);
     }
     // ตอบทุกครั้งที่แอปประกาศ pms-ready (แอปรีโหลดเองครั้งแรกตอน service worker เข้าควบคุม → ประกาศซ้ำ) · PDF ดึงครั้งเดียว
     function onMsg(e) {
@@ -127,10 +148,12 @@
   }
   function run() {
     var d = parse(document, location.href);
+    // โหมดคำสั่งลัด: ส่งลิงก์กลับให้ action "Open URLs" · ไม่ใช่หน้าสารบรรณ = ลิงก์ที่แอปแจ้งว่าข้อมูลไม่ถูกต้อง
+    if (typeof completion === 'function') { completion(d ? link(d, SHORTCUT_MAX) : APP + '\x23/import?e=1'); return; }
     if (!d) { alert('หน้านี้ไม่ใช่หน้าพิมพ์บันทึกงานของสารบรรณ · เปิดหนังสือ → พิมพ์บันทึกงาน แล้วกดอีกครั้ง'); return; }
     send(d);
   }
-  // โหมดทดสอบ: tests/sarabun-parse.test.html ตั้ง window.__pmsTest ก่อนโหลดไฟล์นี้ → ได้ตัว parse โดยไม่เปิดแอป
-  if (window.__pmsTest) { window.__pmsTest.parse = parse; return; }
+  // โหมดทดสอบ: tests/sarabun-parse.test.html ตั้ง window.__pmsTest ก่อนโหลดไฟล์นี้ → ได้ parse/link โดยไม่เปิดแอป
+  if (window.__pmsTest) { window.__pmsTest.parse = parse; window.__pmsTest.link = link; return; }
   run();
 })();

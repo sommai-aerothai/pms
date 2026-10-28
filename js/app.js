@@ -493,7 +493,7 @@ async function saveImport() {
 imp.init(v => {
   S.imp = { ...v, pick: null }; store.pref('sarabun', { last: new Date().toISOString() }); S.rev++;
   if (S.catalog && !app.classList.contains('login')) location.hash === '#/import' ? draw() : go('#/import');   // ยังโหลดไม่เสร็จ/ยังไม่ล็อกอิน: เก็บไว้ก่อน วาดตอนเริ่ม
-}, () => toast('ข้อมูลจากสารบรรณไม่ถูกต้อง · ลองกดปุ่มอีกครั้ง', 'warn', null, 3500));
+}, why => toast(why === 'too-big' ? 'หนังสือยาวเกิน ใช้บุ๊กมาร์กแทน' : 'ข้อมูลจากสารบรรณไม่ถูกต้อง · ลองกดปุ่มอีกครั้ง', 'warn', null, 3500));
 
 // ---------- เริ่มทำงาน ----------
 function themeColor() { $('meta[name=theme-color]').content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(); }

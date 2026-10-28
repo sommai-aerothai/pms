@@ -348,7 +348,7 @@ export function me(S) {
   const r = (i, t, s) => `<button class="row" data-toast="โหมดตัวอย่าง · ยังไม่เปิดใช้">${ic(i, 'lead')}<span class="rt"><span>${t}</span><span class="sub">${s}</span></span>${chev}</button>`, auto = store.pref('auto') !== false;
   return `${nav('ฉัน')}<div class="in"><h1 class="lt">ฉัน</h1><div class="hero"><div class="avatar">${esc([...S.user.name][0])}</div><div class="big">${esc(S.user.name)}</div><div class="sec">${esc(S.user.email || 'CE.SE · AEROTHAI')}</div></div>
  <div class="grp">${r('ok', 'บัญชีบริษัท', store.backendName() === 'demo' ? 'โหมดตัวอย่าง · ยังไม่เชื่อมต่อ' : S.user.email || '')}${store.backendName() === 'demo' ? '' : `<button class="row" data-sheet="pw">${ic('lock', 'lead')}<span class="rt"><span>เปลี่ยนรหัสผ่าน</span></span>${chev}</button>`}${r('sig', 'ลายเซ็นของฉัน', 'ใช้ตอนออกรายงาน')}${r('gear', 'ตั้งค่า', 'แจ้งเตือนรอบ PM · calibration')}</div>
- <div class="sh">เชื่อมต่อ</div><div class="grp"><a class="row" href="#/me/sarabun">${ic('doc', 'lead')}<span class="rt"><span>เชื่อมสารบรรณ</span><span class="sub">ส่งบันทึกงานเข้า PMS ด้วยปุ่มใน Safari</span>${sarStat()}</span>${chev}</a><div class="kv"><span>เซิร์ฟเวอร์: ${store.backendName() === 'demo' ? 'ตัวอย่าง (demo)' : 'Supabase'}</span><button class="btn alt" data-be="${store.backendName() === 'demo' ? 'supabase' : 'demo'}">สลับเป็น ${store.backendName() === 'demo' ? 'Supabase' : 'demo'}</button></div></div>
+ <div class="sh">เชื่อมต่อ</div><div class="grp"><a class="row" href="#/me/sarabun">${ic('doc', 'lead')}<span class="rt"><span>เชื่อมสารบรรณ</span><span class="sub">ส่งบันทึกงานเข้า PMS ด้วยคำสั่งลัดหรือปุ่มใน Safari</span>${sarStat()}</span>${chev}</a><div class="kv"><span>เซิร์ฟเวอร์: ${store.backendName() === 'demo' ? 'ตัวอย่าง (demo)' : 'Supabase'}</span><button class="btn alt" data-be="${store.backendName() === 'demo' ? 'supabase' : 'demo'}">สลับเป็น ${store.backendName() === 'demo' ? 'Supabase' : 'demo'}</button></div></div>
  <div class="sh">พื้นที่ offline</div><div class="grp"><div class="kv"><span>ตั้งเก็บ offline อัตโนมัติ · ตัวอย่าง (ยังไม่โหลดไฟล์จริง)</span>${sw(auto, 'data-pref="auto" aria-label="ตั้งเก็บ offline อัตโนมัติ (ตัวอย่าง)"')}</div><div class="kv"><span>ตั้งไว้ในเครื่อง</span><span>${store.offlineCount()} รายการ</span></div></div>
  <div class="grp">${r('info', 'เกี่ยวกับ / เวอร์ชัน', `${S.version} (${store.backendName()})`)}</div>
  <div class="grp k"><button class="row red" data-signout>${ic('out')}ออกจากระบบ</button></div></div>`;
@@ -359,14 +359,14 @@ const sarStat = () => { const s = store.pref('sarabun'); return s && s.last ? st
 const cut = (t, n) => { const a = [...t.replace(/\s+/g, ' ')]; return a.length > n ? a.slice(0, n).join('') + '…' : a.join(''); };
 function importScreen(S, _, back) {
   const I = S.imp, head = `${nav('นำเข้าจากสารบรรณ', back)}<div class="in"><h1 class="lt">นำเข้าจากสารบรรณ</h1>`;
-  if (!I) return `${head}<div class="grp"><div class="p16"><div class="big">ยังไม่มีข้อมูลที่ส่งเข้ามา</div><div class="sec">เปิดหนังสือในสารบรรณ → พิมพ์บันทึกงาน → แตะปุ่ม "ส่งเข้า PMS"</div></div></div><div class="pad2"><a class="btn alt" href="#/me/sarabun">${ic('book')}วิธีติดตั้งปุ่ม</a></div></div>`;
+  if (!I) return `${head}<div class="grp"><div class="p16"><div class="big">ยังไม่มีข้อมูลที่ส่งเข้ามา</div><div class="sec">เปิดหนังสือในสารบรรณ → พิมพ์บันทึกงาน → แตะแชร์ → "ส่งเข้า PMS"</div></div></div><div class="pad2"><a class="btn alt" href="#/me/sarabun">${ic('book')}วิธีติดตั้ง</a></div></div>`;
   const d = I.data, j = impTarget(S), row = !j && F.matchRow(S.sched.filter(r => !S.jobs.some(x => x.pm && x.pm.sched === r.id)), d.subject, norm, roundOf), kv = ([l, v]) => `<div class="kv"><span>${l}</span><span>${esc(v)}</span></div>`;
   const rows = [['เลขทะเบียน', d.regNo], ['เลขที่เอกสาร', d.docNo], ['ลงวันที่', d.docDate], ['ประเภทเอกสาร', d.docType], ['สถานะ', d.status], ['จาก', d.from], ['ถึง', d.to], ['อ้างถึง', d.ref], ['เรื่อง', d.subject]].filter(r => r[1]);
   const ents = d.entries.map(e => `<div class="row"><span class="rt"><span>${esc(e.unit || e.name)}</span><span class="sub">${esc(e.at)}${e.note ? ' · ' + esc(cut(e.note, 90)) : ''}</span></span></div>`).join('');
   const m = j ? `<button class="row" data-sheet="impjob">${ic('clip', 'lead')}<span class="rt"><span>จับคู่กับงาน: ${esc(F.fmtTitle(j.title))}</span><span class="sub">แตะเพื่อเปลี่ยน</span></span>${chev}</button>`
     : row ? `<a class="row" href="#/pm/new/${row.id}">${ic('plus', 'lead')}<span class="rt"><span>งานนี้ยังไม่ได้เปิด · ตรงกับตาราง PM</span><span class="sub">${esc(F.rowTitle(row))} · แตะเพื่อเปิดงานพร้อมข้อมูลนี้</span></span>${chev}</a>`
     : `<button class="row" data-sheet="impjob">${ic('warn', 'lead w')}<span class="rt"><span>ยังไม่พบงานที่ตรงกับหัวเรื่อง</span><span class="sub">แตะเพื่อเลือกงานเอง</span></span>${chev}</button>`;
-  return `${head}<div class="grp"><div class="kv"><span>ที่มา</span>${st('app', 'สารบรรณ')}</div>${rows.map(kv).join('')}${I.pdfs.length ? kv(['ไฟล์ PDF', I.pdfs.length + ' ไฟล์']) : ''}</div>
+  return `${head}${d.trimmed ? `<div class="grp"><div class="p16">${st('warn', 'ข้อมูลยาวเกิน · ตัดข้อความ/รายการบันทึกงานออกบางส่วน')}<div class="sec">ช่องหลักครบ แต่ข้อความหรือรายการท้าย ๆ ในบันทึกงานอาจหายไป · ต้องการครบทุกข้อความ ใช้บุ๊กมาร์กแทนคำสั่งลัด</div></div></div>` : ''}<div class="grp"><div class="kv"><span>ที่มา</span>${st('app', 'สารบรรณ')}</div>${rows.map(kv).join('')}${I.pdfs.length ? kv(['ไฟล์ PDF', I.pdfs.length + ' ไฟล์']) : ''}</div>
  ${d.entries.length ? `<div class="sh">บันทึกงาน ${d.entries.length} รายการ</div><div class="grp">${ents}</div>` : ''}
  <div class="grp">${m}</div>
  <div class="pad2">${j ? `<button class="btn" data-imp-save>${ic('ok')}บันทึกเข้างาน</button>` : row ? `<a class="btn" href="#/pm/new/${row.id}">${ic('plus')}เปิดงานจากตาราง</a>` : `<button class="btn alt" data-sheet="impjob">${ic('clip')}เลือกงานเพื่อบันทึก</button>`}</div>
@@ -375,8 +375,15 @@ function importScreen(S, _, back) {
 const stp = (n, icon, title, sub, chip) => `<div class="stp"><span class="n">${n}</span><span class="rt"><span>${title}</span><span class="sub">${sub}</span>${chip ? `<span class="st mt1">${ic(icon)}${chip}</span>` : ''}</span></div>`;
 function sarabun(S, _, back) {
   return `${nav('เชื่อมสารบรรณ', back)}<div class="in"><h1 class="lt">เชื่อมสารบรรณ</h1>
- <div class="grp"><div class="row"><span class="rt"><span>ปุ่ม "ส่งเข้า PMS"</span>${sarStat()}</span></div></div>
+ <div class="grp"><div class="row"><span class="rt"><span>ส่งเข้า PMS</span>${sarStat()}</span></div></div>
  <p class="sec note">แอปไม่เห็นรหัสผ่านสารบรรณของคุณ · ใช้การล็อกอินใน Safari ของคุณเอง (iPhone เติมรหัสด้วย Face ID ได้)</p>
+ <div class="sh">วิธีหลัก: คำสั่งลัด (iPhone / iPad / Mac)</div>
+ <div class="pad2"><a class="btn" href="./shortcuts/ส่งเข้า-PMS.shortcut">${ic('dl')}เพิ่มคำสั่งลัด (iPhone/iPad/Mac)</a></div>
+ <div class="grp">
+  ${stp(1, 'dl', 'แตะปุ่มด้านบน แล้วกด "เพิ่มคำสั่งลัด"', 'แอปคำสั่งลัดเปิดขึ้นมาเอง · ครั้งแรก iPhone จะถามอนุญาตให้รันสคริปต์บนหน้าเว็บ ให้กดอนุญาต', 'ดาวน์โหลด › เพิ่มคำสั่งลัด')}
+  ${stp(2, 'doc', 'เปิดหนังสือในสารบรรณ → "พิมพ์บันทึกงาน"', 'ใน Safari ล็อกอินสารบรรณด้วยบัญชีของคุณ', 'พิมพ์บันทึกงาน')}
+  ${stp(3, 'share', 'แตะแชร์ → "ส่งเข้า PMS"', 'แอปเปิดพร้อมข้อมูล ตรวจแล้วกด "บันทึกเข้างาน" · ถ้าไม่เห็นในรายการ เลื่อนลงสุด › แก้ไขการดำเนินการ › เปิด "ส่งเข้า PMS"', 'แชร์ › ส่งเข้า PMS')}</div>
+ <div class="sh">ทางเลือก: บุ๊กมาร์ก</div>
  <div class="pad2"><a class="btn" data-bm-link href="#/me/sarabun" draggable="true">${ic('book')}ส่งเข้า PMS</a><button class="btn alt" data-bm-copy>${ic('doc')}คัดลอกโค้ดปุ่ม</button></div>
  <p class="sec note c">คอมพิวเตอร์: ลากปุ่มบนขึ้นแถบบุ๊กมาร์ก · iPhone: แตะ "คัดลอกโค้ดปุ่ม" แล้วทำตามขั้นตอนด้านล่าง</p>
  <div class="seg" role="group" aria-label="อุปกรณ์"><button data-pane="bm-ph" aria-pressed="true">iPhone</button><button data-pane="bm-pc" aria-pressed="false">คอมพิวเตอร์</button></div>
