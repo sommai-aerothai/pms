@@ -56,8 +56,11 @@ export function roundOf(subject) {
 export function matchJob(jobs, systems, subject) {
   const s = norm(subject), r = roundOf(subject); let best = null, len = 0;
   for (const j of jobs) {
-    const n = norm((systems.find(x => x.id === j.system) || {}).name || '');
-    if (n && r && j.round === r && s.includes(n) && n.length > len) { best = j; len = n.length; }
+    // ชื่อระบบในแคตตาล็อก หรือชื่องานจากตาราง PM (ตัดวงเล็บ) — ใช้ตัวที่ยาวที่สุดที่อยู่ในหัวเรื่อง
+    for (const raw of [(systems.find(x => x.id === j.system) || {}).name, j.pm && j.pm.base && j.pm.base.replace(/\s*\(.*?\)\s*/g, ' ').trim()]) {
+      const n = norm(raw || '');
+      if (n && r && j.round === r && s.includes(n) && n.length > len) { best = j; len = n.length; }
+    }
   }
   return best;
 }
@@ -69,7 +72,11 @@ export const impTarget = S => S.imp && (S.jobs.find(j => j.id === S.imp.pick) ||
 export function applyImport(job, d, now) {
   const keys = [...TOP, 'docDateISO'], notice = Object.fromEntries(keys.map(k => [k, d[k]])); notice.entries = d.entries;
   const meta = { source: 'sarabun', locator: `worklog regNo ${d.regNo}`, extracted_at: now };
-  return { ...job, data: { ...job.data, notice }, field_meta: { ...job.field_meta, ...Object.fromEntries(Object.keys(notice).map(k => ['notice.' + k, meta])) } };
+  // FM-040 อนุมัติ = สถานะเอกสารเสร็จแล้ว หรือมีบันทึกคำว่า "อนุมัติ" · ไม่แน่ใจ = ยังรอ (ผู้ใช้กดจำลอง/ยืนยันเอง)
+  const ok = /เสร็จ/.test(d.status) || d.entries.some(e => /อนุมัติ/.test(e.note));
+  return { ...job, data: { ...job.data, notice }, field_meta: { ...job.field_meta, ...Object.fromEntries(Object.keys(notice).map(k => ['notice.' + k, meta])) },
+    f040: ok ? 'approved' : job.f040, draft: ok ? false : job.draft,
+    vals: { ...(job.vals || {}), f040: { v: `${ok ? 'อนุมัติแล้ว' : 'รออนุมัติ'} · ${d.docNo || d.regNo}`, src: 'sarabun', loc: `บันทึกงาน เลขทะเบียน ${d.regNo}`, at: now.slice(0, 10) } } };
 }
 
 // ---------- บุ๊กมาร์กเล็ต: ย่อเป็นบรรทัดเดียว + ใส่ที่อยู่แอปที่ผู้ใช้เปิดอยู่ ----------

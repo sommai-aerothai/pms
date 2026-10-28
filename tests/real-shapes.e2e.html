@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PMS real-shapes e2e</title>
+<style>body{font:14px system-ui;margin:16px}iframe{width:390px;height:844px;border:1px solid #888}pre{white-space:pre-wrap}</style></head>
+<body>
+<!-- ทดสอบแอปทั้งตัวในเบราว์เซอร์ (headless ได้) ด้วยแถวรูปฐานจริง: backend=supabase + fetch ปลอม (tests/fixtures/supabase-rows.mjs) และ backend=demo
+     เดิน: เอกสาร → ทุกหมวด → ไฟล์ที่มีในระบบ (signed URL ไป /storage/v1/object/sign/docs/…) → ไฟล์ที่มีแค่บนเว็บกอง → รายงาน → งาน PM
+     ตรวจ: ไม่มี error ที่ไม่ได้จับ · แถวแตะได้ (ไม่มีอะไรบัง) · ชุดข้อมูลหนึ่งล้ม (jobs 500) หน้าอื่นยังแตะได้ + การ์ด "ลองใหม่"
+     รัน: python3 -m http.server 8799 (ในโฟลเดอร์ app) แล้วเปิด http://localhost:8799/tests/real-shapes.e2e.html หรือ tests/run-e2e.sh -->
+<pre id="out">กำลังทดสอบ…</pre>
+<script type="module">
+import { fakeFetch, SIGNED, DOCUMENTS, json } from './fixtures/supabase-rows.mjs';
+import { CONFIG } from '../js/config.js';
+import { DOC_GROUPS, KIND_CAT } from '../js/shapes.js';
+
+const out = document.getElementById('out'), lines = []; let fails = 0;
+const ok = (c, m) => { if (!c) fails++; lines.push(`${c ? 'PASS' : 'FAIL'} ${m}`); out.textContent = lines.join('\n'); };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const until = async (fn, ms = 4000) => { const t = Date.now(); while (Date.now() - t < ms) { const v = fn(); if (v) return v; await sleep(40); } return null; };
+const APP = new URL('../', location.href).href;
+
+async function boot(be, fake) {
+  localStorage.clear();
+  localStorage.setItem('pms.backend', be);
+  localStorage.setItem('pms.user', JSON.stringify({ name: 'สมหมาย', email: 'sommai.sa@aerothai.co.th' }));
+  if (be === 'supabase') localStorage.setItem('pms.session', JSON.stringify({ access_token: 'T', refresh_token: 'R', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'u1' } }));
+  window.__fake = fake; window.__supa = CONFIG.supabaseUrl;
+  const html = await (await fetch('../index.html', { cache: 'no-store' })).text();
+  // ก่อนสคริปต์แอป: ย้าย URL ของเอกสารเป็นโฟลเดอร์แอป (ลิงก์ #/… และ ./ui/… ทำงานเหมือนจริง) · fetch ปลอมเฉพาะ Supabase · ไม่ลง service worker · ปิดอนิเมชัน (headless ไม่เดินเวลา transition) · iframe ไปโดเมนอื่นถูกบล็อก (ไม่ยิงเซิร์ฟเวอร์จริง) · เก็บ error ที่ไม่ได้จับ
+  const inject = `<script>history.replaceState(null,'',${JSON.stringify(APP)});<\/script><style>*,*::before,*::after{transition:none!important;animation:none!important}</style><meta http-equiv="Content-Security-Policy" content="frame-src 'self'">
+<script>window.__errs=[];addEventListener('error',e=>__errs.push(String(e.message)));addEventListener('unhandledrejection',e=>__errs.push('rejection: '+(e.reason&&(e.reason.message||JSON.stringify(e.reason)))));
+const rf=window.fetch.bind(window);window.fetch=(u,o)=>parent.__fake&&String(u).startsWith(parent.__supa)?parent.__fake(String(u),o):rf(u,o);delete Navigator.prototype.serviceWorker;<\/script>`;
+  const f = document.createElement('iframe'); document.body.append(f);
+  const d = f.contentDocument; d.open(); d.write(html.replace(/<head>/i, '<head>' + inject)); d.close();
+  const w = f.contentWindow;
+  await until(() => w.document.querySelector('.screen.on'), 8000);
+  return { f, w, $: s => w.document.querySelector(s), $$: s => [...w.document.querySelectorAll(s)] };
+}
+const go = async (A, hash, screen) => { A.w.location.hash = hash; const s = await until(() => A.$(`#${screen}.on`) && !A.$(`#${screen} .sk`) && A.$(`#${screen}`)); await sleep(700); return s; };   // รออนิเมชันเลื่อนหน้าจบ
+// แตะได้ = จุดกลางแถวไม่มีอะไรบัง (ไม่ inert · ไม่มีชั้นทับ)
+const tappable = (A, el) => { el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(), hit = A.w.document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); const yes = !!hit && el.contains(hit) && !el.closest('[inert]'); if (!yes) lines.push(`  ↳ บัง: ${hit ? hit.tagName + '.' + hit.className + ' in #' + (hit.closest('.screen,[id]') || {}).id : 'ไม่มี'} (${el.textContent.slice(0, 30)}) rect=${JSON.stringify(r)} vw=${A.w.innerWidth}x${A.w.innerHeight} tf=${A.w.getComputedStyle(el.closest('.screen')).transform}`); return yes; };
+const tap = async (A, el) => { const h = A.w.location.hash; el.click(); await until(() => A.w.location.hash !== h); await sleep(700); };
+
+async function walk(be, A) {
+  const errs = () => A.w.__errs;
+  ok(A.$('#s-today.on'), `${be}: เปิดแอปแล้ววาดหน้า วันนี้`);
+  const docs = await go(A, '#/docs', 's-docs'); ok(docs, `${be}: เข้าแท็บ เอกสาร`);
+  const homeRows = A.$$('#s-docs .dhome a.row'); ok(homeRows.length >= 3 && homeRows.every(r => tappable(A, r)), `${be}: แถวหมวดในเอกสารแตะได้ (${homeRows.length})`);
+  ok(!A.$('#s-docs .errc'), `${be}: ไม่มีการ์ดโหลดไม่สำเร็จ`);
+  const viewIds = DOC_GROUPS.flatMap(g => g[2].map(x => x[0])).filter(id => id !== 'reports');
+  const shown = homeRows.map(r => r.getAttribute('href')).filter(h => h.startsWith('#/docs/k/')).map(h => h.split('/')[3]);
+  if (be === 'supabase') ok(viewIds.every(id => shown.includes(id)), `${be}: ทุกหมวด (รวม ann/flowpm/manual) ขึ้นในหน้าเอกสาร`);
+  let fileDone = false, webDone = false;
+  for (const id of shown) {
+    const s = await go(A, `#/docs/k/${id}`, 's-kind'), rows = A.$$('#s-kind a.row');
+    ok(s && rows.length && rows.every(r => tappable(A, r)) && (be === 'demo' || !/โหมดตัวอย่าง/.test(s.textContent)), `${be}: หมวด ${id} · ${rows.length} แถว แตะได้${be === 'demo' ? '' : ' · ไม่มีคำ "โหมดตัวอย่าง"'}`);
+    if (be !== 'supabase') { if (!fileDone) { await tap(A, rows[0]); const v = await until(() => A.$('#s-view.on')); ok(v && (A.$('#s-view .pages') || A.$('#s-view a.btn[href^="https://"]')), `${be}: แตะไฟล์ → ตัวดู (หน้าตัวอย่าง/ลิงก์เว็บกอง)`); fileDone = true; } continue; }
+    for (const r of rows) {
+      const fid = decodeURIComponent(r.getAttribute('href').split('/doc/')[1]), row = DOCUMENTS.find(x => String(x.id) === fid);
+      if (!fileDone && row.storage_path) {
+        await tap(A, r); const ifr = await until(() => A.$('#s-view.on iframe.vfile')); if (!ifr) lines.push('  ↳ ตัวดู: ' + A.w.location.href + ' ' + A.f.contentWindow.location.href + ' ' + (A.$('#s-view') || {}).innerHTML?.slice(0, 900) + ' errs=' + A.w.__errs);
+        ok(ifr && ifr.src.startsWith(CONFIG.supabaseUrl + '/storage/v1/object/sign/docs/') && SIGNED.at(-1) === '/storage/v1/object/sign/docs/' + row.storage_path, `${be}: ไฟล์ในระบบ → signed URL จาก bucket docs → iframe (${row.kind})`);
+        ok(A.$('#s-view a.btn[target=_blank]') && !A.$('#s-view .pgbar'), `${be}: มีปุ่มเปิดแท็บใหม่ · ไม่มีเลขหน้าปลอม`);
+        A.$('#s-view [data-sheet^="src:"]').click(); const sh = await until(() => A.$('#sheet.open'));
+        ok(sh && sh.querySelector(`a.btn[href="${row.source_url}"]`), `${be}: "เปิดบนเว็บกอง" = ลิงก์จริง`); A.$('#sheet [data-close]')?.click(); await sleep(100);
+        fileDone = true; await go(A, `#/docs/k/${id}`, 's-kind');   // ไม่ใช้ history.back: เอกสารที่เขียนด้วย document.write ถอยแล้วโหลดใหม่ (เฉพาะชุดทดสอบ)
+      } else if (!webDone && !row.storage_path && /^https:/.test(row.source_url)) {
+        await tap(A, r); const v = await until(() => A.$('#s-view.on'));
+        ok(v && /เปิดจากเว็บกอง \(ต้องอยู่ในเน็ตบริษัท\)/.test(v.textContent) && v.querySelector(`a.btn[href="${row.source_url}"]`) && !v.querySelector('iframe') && !v.querySelector('.pgbar'), `${be}: ไฟล์ที่มีแค่บนเว็บกอง → ลิงก์เว็บกอง + คำเตือนเน็ตบริษัท`);
+        webDone = true; await go(A, `#/docs/k/${id}`, 's-kind');   // ไม่ใช้ history.back: เอกสารที่เขียนด้วย document.write ถอยแล้วโหลดใหม่ (เฉพาะชุดทดสอบ)
+      }
+    }
+  }
+  if (be === 'supabase') ok(fileDone && webDone, `${be}: เดินครบทั้งไฟล์ในระบบและไฟล์เว็บกอง`);
+  // มือถือ: รายงาน › ระบบ › ปี › รอบ (รายการข้างขวาแสดงเฉพาะ iPad)
+  const rep = await go(A, '#/docs/reports', 's-reports'), sys = A.$$('#s-reports #p-sys a.row');
+  ok(rep && sys.length && sys.every(r => tappable(A, r)) && !/undefined|NaN/.test(rep.textContent), `${be}: รายงาน · ระบบ ${sys.length} แตะได้ · ไม่มี undefined/NaN`);
+  const sel = A.$('#s-reports #p-sys a.sel'); if (be === 'supabase') ok(sel && sel.getAttribute('href').endsWith('/DM-TX-RADIO-STBY'), `${be}: เลือกระบบจริงแรกที่มีรายงาน`);
+  await tap(A, sel); const yr = A.$$('#s-years.on a.row'); ok(yr.length && yr.every(r => tappable(A, r)) && !/undefined|NaN/.test(A.$('#s-years').textContent), `${be}: ปีของระบบ ${yr.length} แถว แตะได้`);
+  let rd = [];   // demo: จำนวนต่อปีใน catalog เป็นตัวเลขสมมติ บางปีไม่มีรายงานจริง → ลองปีถัดไป
+  for (const h of yr.map(y => y.getAttribute('href'))) { await go(A, h, 's-rounds'); rd = A.$$('#s-rounds.on a.row'); if (rd.length) break; } ok(rd.length && rd.every(r => tappable(A, r)), `${be}: รอบในปี ${rd.length} รายงาน แตะได้`);
+  await tap(A, rd[0]); const rv = await until(() => A.$('#s-view.on')); ok(rv && !/undefined|NaN/.test(rv.textContent), `${be}: แตะรายงาน → ตัวดู`);
+  const pm = await go(A, '#/pm', 's-pm'); ok(pm && !/undefined|NaN/.test(pm.textContent) && !A.$('#s-pm .errc'), `${be}: แท็บ งาน PM วาดได้`);
+  ok(!errs().length, `${be}: ไม่มี error ที่ไม่ได้จับ${errs().length ? ' · ' + errs().join(' | ') : ''}`);
+  A.f.remove();
+}
+
+try {
+  await walk('demo', await boot('demo', null));
+  await walk('supabase', await boot('supabase', fakeFetch));
+  // ชุดหนึ่งล้ม (jobs 500): เอกสารยังวาด/แตะได้ · งาน PM แสดงการ์ด ไอคอน+คำ + HTTP 500 + ลองใหม่ + รายละเอียด
+  let down = true;
+  const A = await boot('supabase', (u, o) => down && new URL(u).pathname === '/rest/v1/jobs' ? json({ code: 'XX000', message: 'boom', details: null, hint: null }, 500) : fakeFetch(u, o));
+  const d = await go(A, '#/docs', 's-docs'); ok(d && A.$$('#s-docs .dhome a.row').every(r => tappable(A, r)), 'jobs ล้ม: หน้าเอกสารยังแตะได้');
+  const pm = await go(A, '#/pm', 's-pm'), card = A.$('#s-pm .errc');
+  ok(card && /HTTP 500/.test(card.textContent) && card.querySelector('.ic') && card.querySelector('[data-retry]') && /\/rest\/v1\/jobs · 500 · server · XX000 · boom/.test(A.$('#s-pm .errd').textContent), 'jobs ล้ม: การ์ด HTTP 500 + ลองใหม่ + รายละเอียด (path · status · ข้อความ)');
+  down = false; card.querySelector('[data-retry]').click(); ok(await until(() => !A.$('#s-pm .errc')), 'กด ลองใหม่ → โหลดสำเร็จ การ์ดหายไป');
+  ok(!A.w.__errs.length, `jobs ล้ม: ไม่มี error ที่ไม่ได้จับ${A.w.__errs.length ? ' · ' + A.w.__errs.join(' | ') : ''}`);
+  ok(Object.values(KIND_CAT).every(id => DOC_GROUPS.some(g => g[2].some(x => x[0] === id))), 'KIND_CAT ⊆ กลุ่มของหน้าเอกสาร');
+} catch (e) { ok(false, 'ทดสอบพัง: ' + (e && e.stack || e)); }
+lines.push(`DONE ${lines.length} fail=${fails}`); out.textContent = lines.join('\n'); document.title = `DONE fail=${fails}`;
+</script>
+</body></html>

@@ -1,7 +1,7 @@
 # สัญญา supabase.js — เช็กมือหลังสร้างโปรเจกต์จริง
 
 ตั้ง `js/config.js` (supabaseUrl, anonKey) แล้วรัน `schema` ใน SQL Editor · ใน ฉัน › เชื่อมต่อ กด "สลับเป็น Supabase"
-ทุกคำขอมี `apikey` + `Authorization: Bearer <access_token | anon>` · error → `{code, retryAfter}`: 401/403=`auth` · 404=`notfound` · 429=`throttled` (ค่า Retry-After) · อื่นๆ=`server` · ไม่มีเน็ต/`navigator.onLine=false`=`offline`
+ทุกคำขอมี `apikey` + `Authorization: Bearer <access_token | anon>` · error → `{code, retryAfter, status, path, detail}`: 401/403=`auth` · 404=`notfound` · 429=`throttled` (ค่า Retry-After) · อื่นๆ=`server` · ไม่มีเน็ต/`navigator.onLine=false`=`offline`
 
 | ฟังก์ชัน | Endpoint | สถานะที่ต้องได้ | ตรวจอะไร |
 |---|---|---|---|
@@ -10,16 +10,16 @@
 | refresh() | POST /auth/v1/token?grant_type=refresh_token | 200 | เรียกอัตโนมัติเมื่อเหลือ <30 วิ · refresh_token เสีย = ล้าง session แล้ว `auth` |
 | signOut() | (ไม่เรียกเครือข่าย) | - | `pms.session` ถูกลบ |
 | me() | GET /rest/v1/profiles?id=eq.<uid>&select=* | 200 | แถวเดียว · `approved=false` → หน้า "รออนุมัติ" + ปุ่ม "ตรวจสอบอีกครั้ง" · แอดมินกดอนุมัติแล้วกดปุ่มเข้าได้ |
-| getCatalog() | GET /rest/v1/systems?order=seq&select=* | 200 | 10 ระบบ DM เรียงตาม seq · ยังไม่อนุมัติ = [] หรือ 401 |
-| listDocs({kind,cursor}) | GET /rest/v1/documents?...&kind=eq.FM + `Range: 0-49`, `Prefer: count=exact` | 200 หรือ 206 | ≤50 แถว · `next` = null เมื่อครบ ตาม Content-Range · cursor=50 ได้หน้าถัดไป |
+| getCatalog() | GET /rest/v1/systems?order=seq&select=* + GET /rest/v1/examples?select=system_id,fiscal_year | 200 | 10 ระบบ DM เรียงตาม seq · จำนวน/ปีต่อระบบคิดจาก examples · ยังไม่อนุมัติ = [] หรือ 401 |
+| listDocs({kind,cursor}) | GET /rest/v1/documents?...&order=id&kind=eq.FM + `Range: 0-49`, `Prefer: count=exact` | 200 หรือ 206 | ≤50 แถว · `next` = null เมื่อครบ ตาม Content-Range · cursor=50 ได้หน้าถัดไป |
 | listTemplates() | GET /rest/v1/documents?kind=in.(FM,WI,QP,QM)&is_current=eq.true | 200 | ไม่มี kind อื่นปน |
-| listExamples({system_id}) | GET /rest/v1/examples?system_id=eq.<id> | 200 | กรองตามระบบ · ไม่ส่ง = ทั้งหมด |
+| listExamples({system_id}) | GET /rest/v1/examples?system_id=eq.<id> | 200 | กรองตามระบบ · ไม่ส่ง = ทั้งหมด · = รายการรายงานตัวอย่าง (S.docs) |
 | getFiles() | (ใช้ listDocs) | 200 | จัดกลุ่มตาม kind สำหรับหน้า "เอกสาร" |
-| listJobs() | GET /rest/v1/jobs?order=updated_at.desc | 200 | ได้ `updated_at` ติดทุกงาน |
+| listJobs() | GET /rest/v1/jobs?select=*,systems(name)&order=updated_at.desc,id | 200 | ได้ `updated_at` ติดทุกงาน · ชื่อระบบจาก FK systems |
 | getJob(id) | GET /rest/v1/jobs?id=eq.<id> | 200 | ไม่พบ id = `notfound` |
 | putJob(job) | PATCH /rest/v1/jobs?id=eq.<id>&updated_at=eq.<known> (`Prefer: return=representation`) | 200 + 1 แถว | แก้ซ้ำด้วย updated_at เก่า = 200 + `[]` → `{code:'conflict'}` ห้ามเขียนทับ |
-| getDocUrl(storage_path) | POST /storage/v1/object/sign/<bucket>/<path> `{expiresIn:600}` | 200 | URL เต็มเปิดไฟล์ได้ ~10 นาที แล้วหมดอายุ · storage_path รูป `<bucket>/<path>` เช่น `docs/FM/x.pdf` |
-| getBlob(path) | GET <signed URL> | 200 | ได้ Blob ขนาดตรงไฟล์ |
+| signUrl(bucket, storage_path) | POST /storage/v1/object/sign/<bucket>/<path> `{expiresIn:600}` | 200 | URL เต็มเปิดไฟล์ได้ ~10 นาที · bucket จากชนิดข้อมูล (documents → `docs` · examples → `examples` · jobs → `jobs`) · storage_path = path ใน bucket เช่น `FM/x.pdf` |
+| getBlob(bucket, path) | GET <signed URL> | 200 | ได้ Blob ขนาดตรงไฟล์ |
 | putAttachment(jobId,file,meta) | POST /storage/v1/object/jobs/<jobId>/<name> แล้ว POST /rest/v1/attachments | 200 + 201 | ไฟล์อยู่ใน bucket jobs · มีแถว attachments · ผู้ใช้ที่ยังไม่อนุมัติ = 403 `auth` |
 
 หมายเหตุ: `putJob`/`putAttachment` ยังไม่ผูกกับหน้าจอ (store ยังเก็บงานในเครื่อง) — ผูกในขั้น sync

@@ -5,7 +5,7 @@
 --accent-h:211;--accent-l:46.5%;--accent-tl:38.4%;
 --accent:hsl(var(--accent-h) 100% var(--accent-l));--accent-on-fill:#fff;--accent-text:hsl(var(--accent-h) 100% var(--accent-tl));
 --done:#14883b;--warn:#bf5900;--danger:#d70015;--press:#d1d1d6;--bar:rgba(242,242,247,.88);--seg:#e3e3e8;
---paper-bg:#c7c7cc;--paper:#fff;--paper-ink:#000;--paper-ink-2:#595959;--paper-line:#c7c7cc;--paper-fill:#d9d9de;
+--idle-fill:#e5e5ea;--idle-ink:#3a3a3c;--paper-bg:#c7c7cc;--paper:#fff;--paper-ink:#000;--paper-ink-2:#595959;--paper-line:#c7c7cc;--paper-fill:#d9d9de;
 --white:#fff;--black:#000;--scrim:rgba(0,0,0,.4);
 --dock-solid:#fff;--dock-glass:rgba(255,255,255,.85);--dock-border:rgba(0,0,0,.08);
 --shadow-push:-8px 0 24px rgba(0,0,0,.12);--shadow-dock:0 8px 24px rgba(0,0,0,.12);--shadow-knob:0 1px 3px rgba(0,0,0,.3);--shadow-paper:0 2px 8px rgba(0,0,0,.25);
@@ -18,12 +18,12 @@
 /* motion */
 --ease:cubic-bezier(.32,.72,0,1);--ease-spring:cubic-bezier(.32,1.4,.5,1);--dur-press:.1s;--dur-fade:.15s;--dur-quick:.2s;--dur-base:.25s;--dur-sheet:.3s;--dur-push:.35s;--dur-spin:1s;
 /* sizes */
---tap:44px;--tab-swipe-min:60px;--tab-axis:2;--tab-in:30%;--tab-out:20%;--tab-rubber:.35;--chip-scale:1.04;--fade-w:24px;--stagger-ms:30;--stagger-max:8;--lp-ms:450;--skel-ms:350;--dur-slide:.3s;--dur-tab:.28s;--dur-count:.4s;--dur-shimmer:1.2s;--cta-h:52px;--cta-gap:var(--space-3);--dock-h:64px;--dock-min-h:44px;--dock-w-pad:560px;--kbar-h:48px;--sheet-max:600px;
+--tap:44px;--tab-swipe-min:60px;--tab-axis:2;--tab-in:30%;--tab-out:20%;--tab-rubber:.35;--chip-scale:1.04;--fade-w:24px;--stagger-ms:30;--stagger-max:8;--lp-ms:450;--skel-ms:350;--dur-slide:.3s;--dur-tab:.28s;--dur-count:.4s;--dur-shimmer:1.2s;--cta-h:52px;--cta-gap:var(--space-3);--dock-h:64px;--dock-min-h:44px;--dock-w-pad:560px;--kbar-h:48px;--sheet-max:600px;--viewer-h:72vh;
 /* size units (px ที่ใช้ใน base.css) + ค่าท่าทาง/อื่น ๆ ที่ JS อ่านผ่าน getComputedStyle */
---u-2:2px;--u-3:3px;--u-4:4px;--u-5:5px;--u-6:6px;--u-8:8px;--u-10:10px;--u-12:12px;--u-14:14px;--u-16:16px;--u-17:17px;--u-18:18px;--u-20:20px;--u-22:22px;--u-24:24px;--u-27:27px;--u-28:28px;--u-31:31px;--u-36:36px;--u-38:38px;--u-48:48px;--u-50:50px;--u-51:51px;--u-52:52px;--u-56:56px;--u-68:68px;--u-80:80px;--u-84:84px;--u-88:88px;--u-120:120px;--u-140:140px;--u-210:210px;--u-300:300px;--u-320:320px;--u-340:340px;--u-420:420px;--u-520:520px;--u-760:760px;
+--u-2:2px;--u-3:3px;--u-4:4px;--u-5:5px;--u-6:6px;--u-8:8px;--u-10:10px;--u-12:12px;--u-14:14px;--u-16:16px;--u-17:17px;--u-18:18px;--u-20:20px;--u-22:22px;--u-24:24px;--u-27:27px;--u-28:28px;--u-31:31px;--u-36:36px;--u-38:38px;--u-48:48px;--u-50:50px;--u-51:51px;--u-52:52px;--u-56:56px;--u-68:68px;--u-80:80px;--u-84:84px;--u-88:88px;--u-120:120px;--u-140:140px;--u-216:216px;--u-210:210px;--u-300:300px;--u-320:320px;--u-340:340px;--u-360:360px;--u-420:420px;--u-520:520px;--u-760:760px;
 --hair:1px;--swipe-w:96px;--swipe-open:48px;--edge-w:40px;--slop:8px;--ptr-go:70px;--ptr-max:56px;--ptr-open:44px;--card-swipe:60px;--sheet-dismiss:120px;--collapse-y:32px;--dock-shrink:24px;--dock-min-scroll:240px;--dock-gap:8px;--bp-pad:900px;--opacity-dim:.25;--photo-max:1024;--photo-q:.7;--toast-ms:1800;--refresh-ms:800;
 /* safe area (iPhone notch / home indicator) */
 --st:env(safe-area-inset-top,0px);--sa:env(safe-area-inset-bottom,0px);
 --skel-a:color-mix(in srgb,var(--text) 5%,var(--card));--skel-b:color-mix(in srgb,var(--text) 11%,var(--card));
 color-scheme:light dark}
-@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#fff;--text-2:#aeaeb2;--sep:#38383a;--ctrl-border:#8e8e99;--accent-l:68%;--accent-tl:68%;--accent-on-fill:#000;--warn:#ff9f40;--danger:#ff6961;--press:#3a3a3c;--bar:rgba(0,0,0,.85);--seg:#2c2c2e;--paper-bg:#2c2c2e;--dock-solid:#1c1c1e;--dock-glass:rgba(28,28,30,.85);--dock-border:rgba(255,255,255,.12)}}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#fff;--text-2:#aeaeb2;--sep:#38383a;--ctrl-border:#8e8e99;--accent-l:68%;--accent-tl:68%;--accent-on-fill:#000;--warn:#ff9f40;--danger:#ff6961;--press:#3a3a3c;--bar:rgba(0,0,0,.85);--seg:#2c2c2e;--idle-fill:#2c2c2e;--idle-ink:#e5e5ea;--paper-bg:#2c2c2e;--dock-solid:#1c1c1e;--dock-glass:rgba(28,28,30,.85);--dock-border:rgba(255,255,255,.12)}}

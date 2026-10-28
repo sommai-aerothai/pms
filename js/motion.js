@@ -19,10 +19,11 @@ const fade = s => { s.classList.toggle('fl', s.scrollLeft > 1); s.classList.togg
 
 // เลขนับขึ้น + แถบ progress: เล่นเมื่อค่าเปลี่ยนจากที่เห็นครั้งก่อน
 function counts(root) {
-  $$('.cnt,.bar2 i,.bar3 i', root).forEach((e, i) => {
-    const sc = e.closest('.screen'), bar = e.tagName === 'I', v = bar ? parseFloat(e.style.width) || 0 : +e.dataset.v;
+  $$('.cnt,.bar2 i,.bar3 i,.rg .ar', root).forEach((e, i) => {
+    const sc = e.closest('.screen'), arc = e.classList.contains('ar'), bar = e.tagName === 'I', v = arc ? +e.dataset.p : bar ? parseFloat(e.style.width) || 0 : +e.dataset.v;
     const k = `${sc ? sc.id + (sc.dataset.a || '') : ''}|${e.tagName}${e.className}|${i}`, old = prev.get(k); prev.set(k, v);
     if (old === undefined || old === v || RM.matches) return;
+    if (arc) { e.animate([{ strokeDasharray: `${old} 100` }, { strokeDasharray: `${v} 100` }], { duration: ms('dur-count'), easing: tokRaw('ease') }); return; }
     if (bar) { e.style.transition = 'none'; e.style.width = old + '%'; e.offsetWidth; e.style.transition = ''; e.style.width = v + '%'; return; }
     const t0 = performance.now(), d = ms('dur-count');
     (function f(n) { const p = Math.min(1, (n - t0) / d); e.textContent = Math.round(old + (v - old) * p); if (p < 1) requestAnimationFrame(f); })(t0);
