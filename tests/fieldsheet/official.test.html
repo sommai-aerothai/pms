@@ -1,0 +1,83 @@
+<!doctype html><meta charset="utf-8"><title>official form test</title>
+<pre id="out">running…</pre>
+<script type="module">
+addEventListener("unhandledrejection", e => console.log("FS-DONE\nERROR " + (e.reason && e.reason.stack || e.reason))); addEventListener("error", e => console.log("FS-DONE\nERROR " + e.message));
+// ฟอร์มทางการ FM-202 (ไม่มี QR): วาดตารางจาก layout → เขียนลายมือสังเคราะห์ (MNIST + จุด + ลบ) → บิดภาพ → อ่าน
+// ?ocr=1 ทดสอบระบุหน้าด้วย Tesseract ด้วย · ผลคือความแม่นยำรายช่อง (ไม่มีเกณฑ์ผ่าน/ตก — รายงานตามจริง)
+import { loadLayout } from '../../js/fieldsheet/layout.js';
+import { readOfficial } from '../../js/fieldsheet/official.js';
+import { rng, loadSprite, distort } from './synth.js';
+const out = [], log = s => { out.push(s); document.getElementById('out').textContent = out.join('\n'); };
+const q = new URLSearchParams(location.search), _dbg = (globalThis.FS_DEBUG = new URLSearchParams(location.search).has('cells')), SEEDS = +q.get('seeds') || 3, useOcr = q.has('ocr'), K = +q.get('k') || 10;   // k = px/mm ของใบก่อนบิด (10 ≈ ภาพมือถือ 12MP เต็มแผ่น)
+const L = await loadLayout('fm202-official'), sprite = await loadSprite();
+function drawForm(page) {
+  const c = document.createElement('canvas'); c.width = 297 * K; c.height = 210 * K; const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.strokeStyle = '#000'; g.lineWidth = 0.25 * K; g.fillStyle = '#000';
+  const X = L.xEdges, H = L.hLines, x0 = X[0], x1 = X[X.length - 1], yb = H[H.length - 1], line = (a, b, c2, d) => { g.beginPath(); g.moveTo(a * K, b * K); g.lineTo(c2 * K, d * K); g.stroke(); };
+  H.forEach(y => line(x0, y, x1, y)); line(x0, H[0], x0, H[2]); line(x1, H[0], x1, H[2]); [3, 17, 20].forEach(i => line(X[i], H[0], X[i], H[2]));
+  X.forEach(x => line(x, H[3], x, yb));
+  const T = (s, x, y, px = 3, a = 'center') => { g.font = `${px * K}px Arial`; g.textAlign = a; g.fillText(s, x * K, y * K); };
+  T('FM-CE.SE-202', (L.docNo.x0 + L.docNo.x1) / 2, L.docNo.y1 - 2, 3.4); T('PM Tx Radio', 130, 24, 4); T('NO', (X[0] + X[1]) / 2, 64, 2.6); T('Freq.(MHz)', (X[1] + X[2]) / 2, 62, 2.4);
+  T('MaintID PM DM TX Radio Main ครั้งที่ 2/69', L.maintLine.x0 + 1, L.maintLine.y1 - 2, 3.6, 'left');
+  const pg = L.pages[page];
+  for (let r = 0; r < pg.n; r++) { const y = (L.rowEdges[r] + L.rowEdges[r + 1]) / 2 + 1; T(String(pg.tx0 + r), (X[0] + X[1]) / 2, y, 3); T((118 + (pg.tx0 + r) * 1.325).toFixed(3), (X[1] + X[2]) / 2, y, 3); T('PAE T6T', (X[4] + X[5]) / 2, y, 3); }
+  return c;
+}
+function writeChars(g, rect, str, R) {   // str: อักขระ 0-9 . -  → วางในช่อง
+  const w = rect.x1 - rect.x0, h = rect.y1 - rect.y0, wt = ch => ch === '.' ? 0.5 : ch === '-' ? 0.8 : 1, tot = [...str].reduce((a, c) => a + wt(c), 0), unit = (w * 0.9) / tot;
+  let x = rect.x0 + w * 0.05; const dh = Math.min(h * 0.68, unit / 0.62), base = rect.y0 + h * 0.5 + dh / 2;
+  for (const ch of str) {
+    const sw = unit * wt(ch), jx = (R() - .5) * 0.3, jy = (R() - .5) * 0.4;
+    if (/\d/.test(ch)) {
+      const d = +ch, i = sprite.by[d][(R() * sprite.by[d].length) | 0], tx = (i % 20) * 28, ty = ((i / 20) | 0) * 28, src = sprite.g.getImageData(tx, ty, 28, 28), t = document.createElement('canvas'); t.width = t.height = 28;
+      const o = new ImageData(28, 28); for (let p = 0; p < 784; p++) { o.data[p * 4] = 25; o.data[p * 4 + 1] = 25; o.data[p * 4 + 2] = 70; o.data[p * 4 + 3] = src.data[p * 4]; } t.getContext('2d').putImageData(o, 0, 0);
+      const W = dh * 0.62 * 28 / 15 * 1.0, Hh = dh * 28 / 20;   // ตัวเลขจริง 15×20 ของ 28×28
+      g.drawImage(t, (x + sw / 2 + jx) * K - W * K / 2, (base - dh / 2 + jy) * K - Hh * K / 2, W * K, Hh * K);
+    } else if (ch === '.') { g.beginPath(); g.arc((x + sw / 2 + jx) * K, (base - 0.3 + jy * .3) * K, 0.38 * K, 0, 7); g.fill(); }
+    else { g.fillRect((x + 0.05 + jx) * K, (base - dh * 0.5 + jy * .3) * K, (sw - 0.1) * K, 0.4 * K); }
+    x += sw;
+  }
+}
+const rand = n => Array.from({ length: n }, () => 0);
+let fN = 0, fOKc = 0, mOK = 0, cN = 0, cOK = 0, cNull = 0, cWrong = 0, dN = 0, dOK = 0, regFail = 0, idOK = 0, idN = 0, empty = 0; const times = [], byField = {};
+for (let seed = 1; seed <= SEEDS; seed++) for (const page of [1, 2]) {
+  const R = rng(seed * 77 + page), base = drawForm(page), g = base.getContext('2d'), truth = {}, pg = L.pages[page];
+  for (let r = 0; r < pg.n; r++) for (const f of L.fields) {
+    const { int, dec, signed, neg } = f.fmt; let v, str;
+    for (;;) {   // สุ่มค่าที่อยู่ในช่วงของช่อง
+      const ds = n => Array.from({ length: n }, () => (R() * 10) | 0).join('');
+      str = ds(int) + (dec ? '.' + ds(dec) : ''); v = parseFloat(str); const isNeg = neg || (signed && R() < .5); if (isNeg) { str = '-' + str; if (!f.fmt.abs) v = -v; }
+      const vv = f.fmt.abs ? Math.abs(v) : v; if (vv >= f.range[0] && vv <= f.range[1] && !(/^-?0\d/.test(str))) break;
+    }
+    const rect = { x0: f.x0, x1: f.x1, y0: L.rowEdges[r], y1: L.rowEdges[r + 1] };
+    writeChars(g, rect, str, R); truth[`tx[${pg.tx0 + r}].${f.id}`] = { v, str, f: f.id };
+  }
+  const id = distort(base, R, { rot: 4, persp: 0.02, ow: Math.round(base.width * 1.06), oh: Math.round(base.height * 1.09) }), res = await readOfficial(id, { max: 3200, page: useOcr ? undefined : page, ocr: useOcr });
+  if (!res) { regFail++; log(`p${page}/s${seed}: จัดภาพไม่ได้ (ไม่พบตาราง)`); continue; }
+  if (q.has('show') && res?.reg) { const cv = document.createElement('canvas'); cv.width = id.width; cv.height = id.height; const cx = cv.getContext('2d'); cx.putImageData(id, 0, 0); cx.strokeStyle = 'red'; cx.lineWidth = 1;
+    const ap = (x, y) => { const h = res.reg.H, d = h[6] * x + h[7] * y + 1; return [(h[0] * x + h[1] * y + h[2]) / d, (h[3] * x + h[4] * y + h[5]) / d]; };
+    for (let r = 0; r < pg.n; r++) for (const f of L.fields) { const P = [[f.x0, L.rowEdges[r]], [f.x1, L.rowEdges[r]], [f.x1, L.rowEdges[r + 1]], [f.x0, L.rowEdges[r + 1]]].map(p => ap(...p)); cx.beginPath(); P.forEach((p, i) => i ? cx.lineTo(...p) : cx.moveTo(...p)); cx.closePath(); cx.stroke(); }
+    cv.style.width = '1100px'; document.body.append(cv); }
+  if (q.has('cells') && res?.ok && seed === 1 && page === 1) { const wrap = document.createElement('div'); wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;font:10px monospace';
+    for (const v of res.values.slice(0, 70)) { const c = v.cell.dbg, cv = document.createElement('canvas'); cv.width = c.cw; cv.height = c.ch; const cx = cv.getContext('2d'), im = cx.createImageData(c.cw, c.ch); c.g.forEach((x, i) => im.data.set([x, x, x, 255], i * 4)); cx.putImageData(im, 0, 0); cx.strokeStyle = 'red'; c.merged.forEach(b => cx.strokeRect(b[0] + .5, b[1] + .5, b[2] - b[0], b[3] - b[1])); cv.style.cssText = `width:${c.cw * 3}px;image-rendering:pixelated;border:1px solid #888`; const d = document.createElement('div'); d.append(cv, document.createElement('br'), `${v.field.replace('tx','')} want ${truth[v.field].str} got ${v.raw}`); wrap.append(d); }
+    document.body.append(wrap); }
+  if (!res.ok) { regFail++; log(`p${page}/s${seed}: ${res.note}`); continue; }
+  times.push(res.ms); log(`p${page}/s${seed}: จัดภาพ จับคู่ ${res.reg.matched}/${res.reg.of} (เส้น H${res.reg.hl}/V${res.reg.vl}) H[${res.reg.hk}] V[${res.reg.vk}] residual เฉลี่ย ${res.reg.resMean.toFixed(2)} สูงสุด ${res.reg.resMax.toFixed(2)} px`);
+  if (res.meta.ident) { idN++; if (res.meta.ident.form === 'FM-202' && res.meta.ident.page === page) idOK++; else log(`  OCR ระบุ: ${JSON.stringify(res.meta.ident)}`); }
+  if (useOcr) { const want = (118 + 0) , fq = res.values.filter(v => /freq_mhz/.test(v.field)); fN += pg.n; fOKc += fq.filter(v => Math.abs(v.value - (118 + +v.field.match(/\[(\d+)\]/)[1] * 1.325)) < 0.0006).length; if (/Radio Main.*2\s*\/\s*69/.test(res.text)) mOK++; else log("  maint OCR: " + res.text); }
+  const got = Object.fromEntries(res.values.map(v => [v.field, v]));
+  for (const [key, t] of Object.entries(truth)) {
+    const v = got[key], b = byField[t.f] ||= { n: 0, ok: 0 }; cN++; b.n++;
+    const want = t.str.replace(/[^0-9]/g, ''), rd = v ? v.raw.replace(/[^0-9]/g, '') : ''; for (let i = 0; i < want.length; i++) { dN++; if (rd[i] === want[i]) dOK++; }
+    if (!v) { empty++; cWrong++; if (q.has('v')) log(`  ${key} ${t.str} ≠ (ว่าง)`); } else if (v.value === t.v) { cOK++; b.ok++; } else if (v.value == null) cNull++; else { cWrong++; if (q.has('v')) log(`  ${key} ${t.str} ≠ ${v.raw} (${v.confidence})`); }
+  }
+}
+const ms = times.reduce((a, b) => a + b, 0) / (times.length || 1);
+log(`ช่องถูกทั้งค่า ${cOK}/${cN} = ${(100 * cOK / cN).toFixed(1)}% · null(ถามผู้ใช้) ${cNull} · ผิดแบบมั่นใจหรือหายไป ${cWrong} (หาย ${empty}) · จัดภาพไม่ได้ ${regFail} หน้า`);
+log(`ตัวเลขรายหลักถูก ${dOK}/${dN} = ${(100 * dOK / dN).toFixed(1)}%`);
+log('รายฟิลด์: ' + Object.entries(byField).map(([k, b]) => `${k} ${(100 * b.ok / b.n).toFixed(0)}%`).join(' · '));
+if (useOcr) log(`OCR ความถี่ตัวพิมพ์ถูก ${fOKc}/${fN} แถว · บรรทัด MaintID (รอบ 2/69) อ่านได้ ${mOK}/${idN} หน้า`);
+if (idN) log(`OCR ระบุฟอร์ม+หน้า ถูก ${idOK}/${idN}`);
+log(`เวลา/หน้า เฉลี่ย ${ms.toFixed(0)} ms`);
+document.title = 'DONE'; console.log('FS-DONE\n' + out.join('\n'));
+</script>

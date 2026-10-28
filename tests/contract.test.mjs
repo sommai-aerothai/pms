@@ -71,4 +71,28 @@ localStorage.removeItem('pms.session'); let hit = 0; globalThis.fetch = async (u
 const na = await store.listJobs().catch(x => x);
 ok(na.code === 'auth' && hit === 0, 'ไม่มี session → auth (ไม่ยิง anon)');
 
+// ---------- ผลอ่านใบจดค่า/ฟอร์มจริงลายมือ → inspect() → apply202 (เส้นทางเติมเดิม) ----------
+{
+  const { inspect, apply202 } = await import('../js/files.js');
+  const mk = () => ({ id: 'dm-txm-2-69', title: 'DM TX Radio Main (สถานีเครื่องส่ง)', round: '2/69', pm: { base: 'DM TX Radio Main' }, tx: [118.1, 118.55, 119.3].map((freq, i) => ({ n: i + 1, freq, v: {}, photos: {} })) });
+  const ctxFor = res => ({ templates: [], reader: async () => res });
+  const val = (field, value) => ({ field, value, confidence: 'high' });
+  const file = { name: 'ใบจดค่า.jpg', type: 'image/jpeg' };
+  const sheet = job => ({ kind: 'image', subkind: 'fieldsheet', target: { form: 'FM-CE.SE-202', page: 1, job }, sheet: { job, page: 1, layout: 'fm202-v1' }, note: '',
+    values: [val('tx[1].power_w', 27.5), val('tx[2].error_hz', -2.1), val('tx[3].spurious_dbc', 66), val('tx[3].mod_pct', null), { field: 'tx[1].mod_pct', value: 88.8, confidence: 'low' }, val('tx[99].power_w', 30)] });
+  let j = mk(), r = await inspect(file, j, ctxFor(sheet('dm-txm-2-69')));
+  ok(r.state === 'filled' && r.skipped === 1 && r.read.rows.length === 3, 'ใบจดค่า: งานตรง → filled · แถว 99 ที่ไม่มีในงานถูกข้ามและรายงาน');
+  const nf = apply202(j, r.read);
+  ok(j.tx[0].v.pow === '27.5' && j.tx[1].v.err === '-2.1' && j.tx[2].v.spur === '-66' && j.tx[2].v.mod === undefined && j.tx[0].v.mod === undefined && j.tx[2].pend.spur && nf === 3, 'ใบจดค่า: ค่าลงถูกแถว · spur เป็นลบ (ฟอร์ม=บวก) · ค่า null ไม่เติม · รอยืนยัน');
+  j = mk(); r = await inspect(file, j, ctxFor(sheet('other-job')));
+  ok(r.state === 'warn' && !r.read && /ไม่ตรงกับงานนี้/.test(r.text) && j.tx.every(t => !Object.keys(t.v).length), 'ใบจดค่า: job id ไม่ตรง → เตือน ไม่เติม');
+  const off = (maint, f2) => ({ kind: 'image', subkind: 'official-handwriting', target: { form: 'FM-CE.SE-202', page: 1 }, text: 'A4: ' + maint, note: '',
+    values: [val('tx[1].freq_mhz', 118.1), val('tx[1].power_w', 27.5), val('tx[2].freq_mhz', f2), val('tx[2].power_w', 30.1)] });
+  j = mk(); r = await inspect(file, j, ctxFor(off('MaintID PM DM TX Radio Main ครั้งที่ 2/69', 118.5)));
+  apply202(j, r.read);
+  ok(r.state === 'filled' && r.skipped === 1 && j.tx[0].v.pow === '27.5' && j.tx[1].v.pow === undefined, 'ฟอร์มจริง: จับคู่ด้วยความถี่ที่อ่านได้ · ความถี่ไม่ตรง = เว้นว่าง');
+  j = mk(); r = await inspect(file, j, ctxFor(off('MaintID PM DM TX Radio Main ครั้งที่ 1/69', 118.55)));
+  ok(r.state === 'warn' && !r.read, 'ฟอร์มจริง: รอบไม่ตรง → เตือน ไม่เติม');
+}
+
 console.log(`\n${n} ข้อ · ${process.exitCode ? 'มีข้อไม่ผ่าน' : 'ผ่านทั้งหมด'}`);
