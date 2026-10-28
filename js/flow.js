@@ -63,7 +63,7 @@ export function newPmJob({ id, row, off, system, eng, travel, draft, prev = {}, 
 export function normJob(j) {
   const x = { f040: j.status === 'done' ? 'approved' : 'wait', draft: false, eng: '', travel: '', vals: {}, ready: {}, auto: true, files: [], tools: [], pm: { base: j.title, days: null, people: [], off: false }, ...j };
   const old = ((j.folder && j.folder.photos) || []).filter(p => p.id).map(p => ({ name: p.name || 'รูป', type: p.type || 'image/jpeg', size: 0, state: 'attached', target: '', text: 'ไฟล์จากโฟลเดอร์งานเดิม', id: p.id }));
-  x.files = [...(j.files || []), ...old];
+  x.files = [...(j.files || []), ...old.filter(p => !(j.files || []).some(f => f.id === p.id))]; delete x.folder;   // ย้ายครั้งเดียว: ไม่ซ้ำ · ลบแล้วไม่กลับมา
   x.forms = (x.forms || []).map(f => ({ kind: 'manual', ...f, kind: ['tx', 'asset', 'review'].includes(f.kind) ? f.kind : 'manual', done: f.done ?? f.kind === 'done' }));
   return x;
 }

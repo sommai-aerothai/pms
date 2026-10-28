@@ -327,7 +327,7 @@ function ctaGo() {
 
 // ---------- เหตุการณ์ ----------
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-retry],[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-spot],[data-vo],[data-ex],[data-sopen],[data-sx],[data-more],[data-site],[data-eng],[data-eng-other],[data-travel],[data-offrd],[data-use-imp],[data-open-draft],[data-sim040],[data-chk],[data-confirm-form],[data-form-done],[data-assign],[data-file-del],[data-val-edit],[data-val-save],[data-val-ok],[data-evt],#cta,[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],[data-impjob],[data-imp-save],[data-bm-link],[data-bm-copy],#bd');
+  const t = e.target.closest('[data-dl-ed],[data-retry],[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-spot],[data-vo],[data-ex],[data-sopen],[data-sx],[data-more],[data-site],[data-eng],[data-eng-other],[data-travel],[data-offrd],[data-use-imp],[data-open-draft],[data-sim040],[data-chk],[data-confirm-form],[data-form-done],[data-assign],[data-file-del],[data-val-edit],[data-val-save],[data-val-ok],[data-evt],#cta,[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],[data-impjob],[data-imp-save],[data-bm-link],[data-bm-copy],#bd');
   if (!t) return; const d = t.dataset;
   if (d.pre) { const [k, v] = d.pre.split(':'); S.ui[k] = v; S.rev++; }
   if ('vo' in d) { S.ui.vo = !t.parentNode.open; return; }
@@ -369,7 +369,9 @@ document.addEventListener('click', e => {
   }
   else if (d.dlEd) {   // ไฟล์แก้ได้ (Word/Excel) ของเอกสารที่รวมกับ PDF: ขอ signed URL ตอนกดแล้วดาวน์โหลด
     const it = V.viewItem(S, d.dlEd);
-    store.fileUrl(it && it.editable).then(url => { if (!url) throw 0; const a = document.createElement('a'); a.href = url; a.download = ''; a.rel = 'noopener'; a.click(); }).catch(() => toast('ดาวน์โหลดไม่สำเร็จ ลองอีกครั้ง', 'warn'));
+    store.fileUrl(it && it.editable).then(url => url ? fetch(url) : Promise.reject()).then(r => r.ok ? r.blob() : Promise.reject())   // โหลดเป็น blob แล้วบันทึก: ไม่ออกจากแอป ไม่พึ่ง header ของ Storage
+      .then(b => { const a = document.createElement('a'), u = URL.createObjectURL(b); a.href = u; a.download = it.editable.file || 'file'; a.click(); setTimeout(() => URL.revokeObjectURL(u), 60000); })
+      .catch(() => toast('ดาวน์โหลดไม่สำเร็จ ลองอีกครั้ง', 'warn'));
   }
   else if (d.offAct) { closeSheet(); const on = !V.isOff(S, d.offAct); store.setOffline(d.offAct, on); S.rev++; draw(); toast(on ? 'เก็บไว้ดู offline แล้ว' : 'ลบออกจาก offline แล้ว', on ? 'dl' : 'trash'); }
   else if (d.pane) { $$('button', t.parentNode).forEach(b => b.setAttribute('aria-pressed', b === t)); $$(':scope > .pane', $('#' + d.pane).parentNode).forEach(p => { p.hidden = p.id !== d.pane; }); if (/^[pr]-/.test(d.pane)) S.ui[d.pane[0]] = d.pane; if (/^pm-/.test(d.pane)) { S.ui.pmt = d.pane; drawCta(); } }
