@@ -2,8 +2,10 @@
 # รัน: tests/fieldsheet/run.sh [pdf]   (ต้องมี Google Chrome; โหมด pdf ต้องมี pdftoppm)
 cd "$(dirname "$0")/../.." || exit 1
 CH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; UD=$(mktemp -d);   # โปรไฟล์ชั่วคราวต่อรอบ: ไม่ชนกับ Chrome ตัวอื่น (เคยทำให้ headless ค้าง/เงียบ)
- PORT=${PORT:-18731}; LOG=$(mktemp)
-python3 -m http.server $PORT >/dev/null 2>&1 & SRV=$!; trap 'kill $SRV' EXIT; sleep 1
+PORTF=$(mktemp); LOG=$(mktemp)   # พอร์ตว่างจาก tests/serve.py (backlog 128) · รอบรรทัดพอร์ตแทน sleep เดา
+python3 tests/serve.py >"$PORTF" & SRV=$!; trap 'kill $SRV 2>/dev/null; rm -f "$PORTF"' EXIT
+for _ in $(seq 1 50); do PORT=$(cat "$PORTF"); [ -n "$PORT" ] && break; sleep 0.1; done
+[ -n "$PORT" ] || { echo "เซิร์ฟเวอร์ไม่ขึ้น"; exit 1; }
 PAGE=${TEST:-fieldsheet}; URL="http://localhost:$PORT/tests/fieldsheet/$PAGE.test.html"
 if [ "$1" = pdf ]; then
   mkdir -p tests/fieldsheet/.tmp
