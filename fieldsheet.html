@@ -25,7 +25,8 @@ import { sheetSvg, pageCount } from './js/fieldsheet/print.js';
 const LAYOUTS = { 'FM-202': 'fm202-v1' };   // เพิ่ม FM-501/FM-502 ที่นี่เมื่อมี layout
 const q = new URLSearchParams(location.search), job = q.get('job') || 'demo', form = q.get('form') || 'FM-202';
 const L = await loadLayout(LAYOUTS[form] || '');
-const freqs = (q.get('freqs') || '').split(',').filter(Boolean).map(Number), n = Math.max(1, Math.min(200, +q.get('n') || freqs.length || 21));
+const freqs = q.get('freqs') ? q.get('freqs').split(',').map(x => x === '' || !isFinite(+x) ? null : +x) : [], n =   // ช่องว่าง = เครื่องที่ยังไม่มีความถี่ · คงตำแหน่งไว้ ไม่งั้นความถี่เลื่อนไปผิดแถว Tx
+   Math.max(1, Math.min(200, +q.get('n') || freqs.length || 21));
 const txs = Array.from({ length: n }, (_, i) => ({ no: i + 1, freq: freqs[i] ?? null }));
 const total = pageCount(L, n), only = +q.get('page') || 0;
 document.getElementById('pages').innerHTML = Array.from({ length: total }, (_, i) => i + 1).filter(p => !only || p === only)
