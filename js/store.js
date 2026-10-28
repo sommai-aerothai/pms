@@ -4,6 +4,7 @@ import { wipe as wipePhotos } from './photos.js';
 import * as sharepoint from './backend/sharepoint.js';
 import * as supabase from './backend/supabase.js';
 import { CONFIG } from './config.js';
+import { normJob } from './flow.js';
 
 const ls = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -26,17 +27,21 @@ export const getFiles = () => be().getFiles();
 // งาน PM = jobs[]: ค่าที่พิมพ์/รูปเก็บในเครื่อง (localStorage 'pms.job.<id>') · งานที่ผู้ใช้สร้างเก็บรายการ id ไว้ที่ 'pms.jobx'
 export const listJobs = async () => {
   const hid = ls.get('pms.jobhid') || [], seed = (await be().listJobs()).filter(j => !hid.includes(j.id)), mine = (ls.get('pms.jobx') || []).map(id => ls.get('pms.job.' + id)).filter(Boolean);
-  return [...seed.map(j => ({ ...j, ...ls.get('pms.job.' + j.id) })), ...mine];
+  return [...seed.map(j => ({ ...j, ...ls.get('pms.job.' + j.id) })), ...mine].map(normJob);
 };
+// วันนี้ (ตามเวลาไทย) · demo ใช้วันสมมติ (ดู demo.js) เพื่อให้ตารางปีงบ 2569 มี "เดือนนี้/เดือนหน้า"
+export const today = () => be().today ? be().today() : new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+// รอบก่อนของสถานี: วิศวกรเฝ้าระวัง + เครื่องมือ (จาก backend) · การเดินทาง/วิศวกรที่เคยเลือกจำต่อสถานีในเครื่องนี้
+export const prevRound = (key, site) => { const b = (be().prevRound ? be().prevRound(site) : {}), m = pref('last.' + key) || {}; return { eng: [...new Set([...(m.eng || []), ...(b.eng || [])])], travel: m.travel || b.travel || '', tools: b.tools || [] }; };
+export const rememberRound = (key, eng, travel) => { const m = pref('last.' + key) || {}; pref('last.' + key, { eng: [...new Set([eng, ...(m.eng || [])].filter(Boolean))].slice(0, 6), travel: travel || m.travel || '' }); };
 // ลบงาน (demo): งานที่ผู้ใช้สร้างลบจริง · งานตัวอย่างจาก backend ซ่อนไว้ (pms.jobhid)
 export const dropJob = id => { ls.set('pms.jobhid', [...(ls.get('pms.jobhid') || []), id]); ls.set('pms.jobx', (ls.get('pms.jobx') || []).filter(x => x !== id)); try { localStorage.removeItem('pms.job.' + id); } catch {} };
 export const putJob = job => ls.set('pms.job.' + job.id, job);
-export const newJob = async (sys, round, dates) => {
-  const ids = new Set((await listJobs()).map(j => j.id)); let id = `${sys.id}-${round.replace('/', '-')}`; if (ids.has(id)) id += '-' + Date.now().toString(36);
-  const j = be().genericJob(id, `${sys.name} ${round}`, sys.id, round, dates, 'todo', new Date().toISOString());
-  if (!putJob(j)) return null;
-  if (!ls.set('pms.jobx', [...(ls.get('pms.jobx') || []), id])) { localStorage.removeItem('pms.job.' + id); return null; }   // ดัชนีเขียนไม่ได้ = ไม่ถือว่าสร้างสำเร็จ
-  return j;
+// งานใหม่ (ผู้ใช้เปิดเอง): เก็บในเครื่อง + จดดัชนี · false = พื้นที่เต็ม
+export const addJob = job => {
+  if (!putJob(job)) return false;
+  if (!ls.set('pms.jobx', [...(ls.get('pms.jobx') || []), job.id])) { try { localStorage.removeItem('pms.job.' + job.id); } catch {} return false; }   // ดัชนีเขียนไม่ได้ = ไม่ถือว่าสร้างสำเร็จ
+  return true;
 };
 
 // ค่าตั้ง/ผู้ใช้/รายการเก็บ offline
