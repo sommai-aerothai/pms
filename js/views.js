@@ -366,7 +366,7 @@ function importScreen(S, _, back) {
   const m = j ? `<button class="row" data-sheet="impjob">${ic('clip', 'lead')}<span class="rt"><span>จับคู่กับงาน: ${esc(F.fmtTitle(j.title))}</span><span class="sub">แตะเพื่อเปลี่ยน</span></span>${chev}</button>`
     : row ? `<a class="row" href="#/pm/new/${row.id}">${ic('plus', 'lead')}<span class="rt"><span>งานนี้ยังไม่ได้เปิด · ตรงกับตาราง PM</span><span class="sub">${esc(F.rowTitle(row))} · แตะเพื่อเปิดงานพร้อมข้อมูลนี้</span></span>${chev}</a>`
     : `<button class="row" data-sheet="impjob">${ic('warn', 'lead w')}<span class="rt"><span>ยังไม่พบงานที่ตรงกับหัวเรื่อง</span><span class="sub">แตะเพื่อเลือกงานเอง</span></span>${chev}</button>`;
-  return `${head}${d.trimmed ? `<div class="grp"><div class="p16">${st('warn', 'ข้อมูลยาวเกิน · ตัดข้อความบันทึกงานออกแล้ว')}<div class="sec">ช่องหลักครบ แต่ข้อความในบันทึกงานหายไป · ต้องการครบทุกข้อความ ใช้บุ๊กมาร์กแทนคำสั่งลัด</div></div></div>` : ''}<div class="grp"><div class="kv"><span>ที่มา</span>${st('app', 'สารบรรณ')}</div>${rows.map(kv).join('')}${I.pdfs.length ? kv(['ไฟล์ PDF', I.pdfs.length + ' ไฟล์']) : ''}</div>
+  return `${head}${d.trimmed ? `<div class="grp"><div class="p16">${st('warn', 'ข้อมูลยาวเกิน · ตัดข้อความ/รายการบันทึกงานออกบางส่วน')}<div class="sec">ช่องหลักครบ แต่ข้อความหรือรายการท้าย ๆ ในบันทึกงานอาจหายไป · ต้องการครบทุกข้อความ ใช้บุ๊กมาร์กแทนคำสั่งลัด</div></div></div>` : ''}<div class="grp"><div class="kv"><span>ที่มา</span>${st('app', 'สารบรรณ')}</div>${rows.map(kv).join('')}${I.pdfs.length ? kv(['ไฟล์ PDF', I.pdfs.length + ' ไฟล์']) : ''}</div>
  ${d.entries.length ? `<div class="sh">บันทึกงาน ${d.entries.length} รายการ</div><div class="grp">${ents}</div>` : ''}
  <div class="grp">${m}</div>
  <div class="pad2">${j ? `<button class="btn" data-imp-save>${ic('ok')}บันทึกเข้างาน</button>` : row ? `<a class="btn" href="#/pm/new/${row.id}">${ic('plus')}เปิดงานจากตาราง</a>` : `<button class="btn alt" data-sheet="impjob">${ic('clip')}เลือกงานเพื่อบันทึก</button>`}</div>
@@ -378,7 +378,7 @@ function sarabun(S, _, back) {
  <div class="grp"><div class="row"><span class="rt"><span>ส่งเข้า PMS</span>${sarStat()}</span></div></div>
  <p class="sec note">แอปไม่เห็นรหัสผ่านสารบรรณของคุณ · ใช้การล็อกอินใน Safari ของคุณเอง (iPhone เติมรหัสด้วย Face ID ได้)</p>
  <div class="sh">วิธีหลัก: คำสั่งลัด (iPhone / iPad / Mac)</div>
- <div class="pad2">${dlBtn('./shortcuts/ส่งเข้า-PMS.shortcut', 'เพิ่มคำสั่งลัด (iPhone/iPad/Mac)')}</div>
+ <div class="pad2"><a class="btn" href="./shortcuts/ส่งเข้า-PMS.shortcut">${ic('dl')}เพิ่มคำสั่งลัด (iPhone/iPad/Mac)</a></div>
  <div class="grp">
   ${stp(1, 'dl', 'แตะปุ่มด้านบน แล้วกด "เพิ่มคำสั่งลัด"', 'แอปคำสั่งลัดเปิดขึ้นมาเอง · ครั้งแรก iPhone จะถามอนุญาตให้รันสคริปต์บนหน้าเว็บ ให้กดอนุญาต', 'ดาวน์โหลด › เพิ่มคำสั่งลัด')}
   ${stp(2, 'doc', 'เปิดหนังสือในสารบรรณ → "พิมพ์บันทึกงาน"', 'ใน Safari ล็อกอินสารบรรณด้วยบัญชีของคุณ', 'พิมพ์บันทึกงาน')}
