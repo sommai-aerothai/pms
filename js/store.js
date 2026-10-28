@@ -18,7 +18,7 @@ export const auth = () => be();   // signIn / changePassword / me (เฉพา�
 
 // ทุกชุดข้อมูลผ่าน shapes.js → หน้าจอเห็นโครงเดียวไม่ว่า backend ไหน (ดูช่องที่ใช้ได้ในหัว shapes.js)
 export const listReports = async () => (await be().listExamples()).map(sh.report);   // S.docs = ตัวอย่างรายงาน (examples) เท่านั้น
-export const listTemplates = async () => (await be().listTemplates()).map(sh.template);
+export const listTemplates = async () => (await be().listTemplates()).map(sh.template).filter(t => t.cat !== 'ann');   // หนังสือขออนุมัติ (รหัสเดียวกับฟอร์ม) ไม่ใช่แม่แบบ
 export const getCatalog = async () => sh.catalog(await be().getCatalog());
 export const getFiles = async () => (await be().getFiles()).map(sh.cat);   // หมวดเอกสารเว็บกอง (documents)
 // ลิงก์ไฟล์จริง: bucket มาจากชนิดข้อมูล (doc → docs · report → examples) · ไม่มี storagePath = null (ใช้ sourceUrl แทน)

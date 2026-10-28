@@ -114,4 +114,30 @@ ok(na.code === 'auth' && hit === 0, 'ไม่มี session → auth (ไม่
   ok(r.state === 'warn' && !r.read, 'ฟอร์มจริง: รอบไม่ตรง → เตือน ไม่เติม');
 }
 
+// ---------- รายการเอกสารจริง: เรียง · วันที่ดึง · หนังสือขออนุมัติ · ไม่ซ้ำ · ชื่อไฟล์ตกค้าง (ชื่อ placeholder) ----------
+{
+  const R = (id, kind, code, file, extra = {}) => ({ id, kind, code, title: code, file, storage_path: 'x/' + file, ...extra });
+  const raw = [
+    R(1, 'FM', 'FM-CE.SE-011', 'FM-CE.SE-011 แบบ ก.pdf', { fetched_at: null }), R(2, 'FM', 'FM-CE.SE-009', 'FM-CE.SE-009 แบบ ข.pdf'), R(3, 'FM', 'FM-CE.SE-008', 'FM-CE.SE-008 แบบ ค.pdf'),
+    R(4, 'FM', 'FM-CE.SE-008', 'FM-CE.SE-008 แบบ ค.doc', { fetched_at: '2026-10-28T06:37:00Z' }),   // ไฟล์แก้ได้ได้ fetched_at แต่ PDF ไม่มี
+    R(5, 'FM', 'FM-CE.SE-037', '2567 วส.บว-ชื่อ17-2567 ขออนุมัติใช้ ส่ง2 FM-037.pdf', { rev: '02' }), R(6, 'FM', 'FM-CE.SE-037', 'FM-CE.SE-037 ใบตรวจ Rev.02.pdf', { rev: '02' }),
+    R(7, 'FM', 'FM-CE.SE-040', '2566 วส.บว-ชื่อ6-2566 ขออนุมัติใช้เอกสาร แบบฟอร์ม FM-40 ส่ง2.pdf'), R(8, 'FM', 'FM-CE.SE-041', 'FM-CE.SE-041 รายงาน Rev.1.pdf', { rev: '1' }), R(9, 'FM', 'FM-CE.SE-041', 'FM-CE.SE-041 รายงาน Rev.2.pdf', { rev: '2' }),
+    R(10, 'FM', '', 'ใบเปล่า b.pdf'), R(11, 'FM', '', 'ก ใบเปล่า.pdf'), R(12, 'WI', 'WI-CE.SE-006', 'WI-CE.SE-006 วิธี.pdf'), R(13, 'WI', 'WI-CE.SE-004', 'WI-CE.SE-004 วิธี.pdf'),
+    R(14, 'WI', 'WI-CE.SE-030', 'WI-CE.SE-030 signed.ผวส.บว.pdf'), R(15, 'WI', 'WI-CE.SE-031', '2561 วส.บว1849/2561 ขออนุมัติ WI.pdf')];
+  const cats = Object.fromEntries(sh.groupDocs(raw).map(c => [c.id, c])), fm = cats.fm, wi = cats.wi, ann = cats.ann;
+  const codes = c => c.rows.map(d => d.code);
+  ok(codes(fm).slice(0, 5).join() === 'FM-CE.SE-008,FM-CE.SE-009,FM-CE.SE-011,FM-CE.SE-037,FM-CE.SE-041' && codes(wi).join() === 'WI-CE.SE-004,WI-CE.SE-006', 'เรียงตามรหัสแบบเลขธรรมชาติ (008 ก่อน 009 ก่อน 011)');
+  ok(fm.rows.slice(-2).every(d => !d.code) && fm.rows.at(-2).title === 'ก ใบเปล่า', 'แถวไม่มีรหัสอยู่ท้ายสุด เรียงตามชื่อ');
+  ok(sh.cat(fm).rows.at(-1).title === 'ใบเปล่า' && fm.rows.find(d => d.code === 'FM-CE.SE-008').fetchedAt === '2026-10-28T06:37:00Z', 'รวม PDF+doc แล้ว fetchedAt ไม่หาย (ได้ค่าที่ใหม่กว่า)');
+  ok(Math.max(...[].concat(...Object.values(cats).map(c => c.rows.map(d => +new Date(d.fetchedAt || 0))))) === +new Date('2026-10-28T06:37:00Z'), 'หัวหน้าเอกสาร: max fetchedAt ของทุกแถวหลังรวมยังอยู่');
+  ok(ann.rows.length === 4 && !fm.rows.some(d => /ขออนุมัติ/.test(d.file)) && !wi.rows.some(d => /ผวส|ขออนุมัติ/.test(d.file)) && ann.total === 4 && fm.total === 8, 'หนังสือขออนุมัติย้ายเข้า ann · ไม่เหลือในฟอร์ม/WI · จำนวนหมวดตาม');
+  ok(Object.values(cats).every(c => { const k = c.rows.filter(d => d.code).map(d => d.code + '|' + d.rev); return new Set(k).size === k.length; }), 'ไม่มีรหัสซ้ำ (รหัส+Rev) ในหมวดเดียวกัน');
+  const r41 = fm.rows.filter(d => d.code === 'FM-CE.SE-041'); ok(r41.length === 2 && r41[0].rev === '2' && r41[1].rev === '1', 'รหัสเดียว Rev ต่าง: แสดงทั้งคู่ Rev ใหม่ก่อน');
+  const nm = (code, file, title = code) => sh.doc({ code, title, file, kind: 'FM' }).title;
+  ok(nm('FM-CE.SE-009', 'FM-CE.SE-009 PM RCAG a.pdf') === 'PM RCAG' && nm('FM-CE.SE-002', 'FM-CE.SE-002 รายงาน ok.doc') === 'รายงาน' && nm('FM-CE.SE-002', 'FM-CE.SE-002 รายงาน edit.doc') === 'รายงาน', 'ชื่อจากไฟล์: ตัดนามสกุล/คำเดี่ยวท้าย');
+  ok(nm('FM-CE.SE-005', 'FM-CE.SE-005 04 FM-CESE-005 รายการเครื่องมืออะไหล่ edit.doc') === 'รายการเครื่องมืออะไหล่' && nm('FM-CE.SE-009', 'FM-CE.SE-009 PM RCAG a.pdf') === 'PM RCAG', 'ชื่อจากไฟล์: ตัดรหัสซ้ำนำหน้า · คำท้าย edit/a');
+  ok(nm('WI-CE.SE-005', 'WI-CE.SE-005 PM TX.pdf') === 'PM TX' && nm('WI-CE.SE-018', 'WI-CE.SE-018 CM PAE RX ok.pdf') === 'CM PAE RX', 'ชื่อจากไฟล์: TX/RX ตัวใหญ่ไม่ถูกตัด');
+  ok(nm('FM-CE.SE-005', 'FM-CE.SE-005 ชื่อไฟล์เก่า.pdf', 'FM-CE.SE-005 ชื่อจริงจากฐาน') === 'ชื่อจริงจากฐาน' && nm('FM-CE.SE-005', 'FM-CE.SE-005 ชื่อไฟล์เก่า.pdf', 'งาน PM') === 'งาน PM', 'title ในฐานที่เป็นชื่อจริงชนะชื่อจากไฟล์ (และไม่โดนตัดคำท้าย)');
+}
+
 console.log(`\n${n} ข้อ · ${process.exitCode ? 'มีข้อไม่ผ่าน' : 'ผ่านทั้งหมด'}`);
