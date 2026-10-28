@@ -2,6 +2,7 @@
 // ขั้นของงาน · ความพร้อม · ความคืบหน้าฟอร์ม · ตัวขัดขวาง (วันนี้) · ตารางงานเดือนนี้/เดือนหน้า
 import { formsFor } from './data/wi-scope.js';
 import { ORDER } from './data/schedule-2569.js';
+import { norm } from './import-sarabun.js';
 
 export const STAGES = [['plan', 'แผน', 'งานโผล่จากตาราง PM · เปิดงาน'], ['notice', 'แจ้งซ่อม', 'นำเข้า FM-040 ที่อนุมัติ (QP 6.6)'], ['prep', 'เตรียม', 'เครื่องมือ FM-005 · WI/ฟอร์ม Rev ล่าสุด (QP 6.7)'],
   ['site', 'หน้างาน', 'ทำตาม WI ทีละอุปกรณ์ · ตรวจทรัพย์สิน · ทบทวนคู่มือ (QP 6.8)'], ['report', 'รายงาน', 'ออก FM-006 + แนบตามรายการ · ภายใน 20 วันทำการ (QP 6.9)'], ['send', 'ส่ง', 'ส่งผ่านสารบรรณ · ผู้ตรวจรับ (QP 6.9, 6.12)']];
@@ -20,9 +21,15 @@ export const rowBase = r => r.job.replace(/\s*\(.*?\)\s*/g, ' ').trim();   // �
 export const sysFor = (title, systems) => ((systems || []).filter(s => title.startsWith(s.name)).sort((a, b) => b.name.length - a.name.length)[0] || {}).id || '';
 export const navTitle = j => fmtTitle(j.title);
 export const rowDur = r => r.days ? `${r.days} วัน` : r.range || '';
+// คนในตาราง/งาน = ผู้ใช้หรือไม่ · ชื่อโปรไฟล์จริงเป็นชื่อเต็ม "ชื่อ ชื่อเล่น นามสกุล" แต่ตารางเก็บแค่ชื่อต้น → ตรงเมื่อเท่าชื่อเต็ม · ชื่อต้น · ชื่อเล่น (คำที่ 2 เมื่อมี ≥3 คำ; ไม่ใช้นามสกุล)
+export const isMe = (person, user) => {
+  const p = norm(person ?? '').trim(), t = norm(user ?? '').trim().split(' ').filter(Boolean);
+  return !!p && !!t.length && (p === t.join(' ') || p === t[0] || (t.length > 2 && p === t[1]));
+};
+export const hasMe = (people, me) => (people || []).some(x => isMe(x, me));
 // รายการตารางที่ยังไม่เปิด จัดกลุ่ม เดือนนี้ / เดือนหน้า / ทั้งปี (today = YYYY-MM-DD) · ของฉัน (me) ขึ้นก่อนในกลุ่ม
 export function scheduleGroups(rows, opened, today, me = '') {
-  const m0 = today.slice(0, 7), m1 = addMonth(m0, 1), open = new Set(opened), L = rows.filter(r => !open.has(r.id)), mine = r => r.people.includes(me) ? 0 : 1;
+  const m0 = today.slice(0, 7), m1 = addMonth(m0, 1), open = new Set(opened), L = rows.filter(r => !open.has(r.id)), mine = r => hasMe(r.people, me) ? 0 : 1;
   const by = f => L.filter(f).sort((a, b) => mine(a) - mine(b));
   return [['เดือนนี้', m0, by(r => r.ym === m0)], ['เดือนหน้า', m1, by(r => r.ym === m1)], ['ทั้งปี', '', by(r => r.ym !== m0 && r.ym !== m1)]];
 }
@@ -108,7 +115,7 @@ export function prepChecks(j, ctx) {
 export const prepOk = (j, ctx) => prepChecks(j, ctx).every(c => c.auto);
 export const stageOf = (j, ctx) => j.status === 'done' || j.status === 'submitted' ? 5 : j.f040 !== 'approved' ? 1 : !prepOk(j, ctx) ? 2 : j.forms.every(f => formOk(j, f)) ? 4 : 3;
 export const phaseOf = (j, ctx) => { if (j.status === 'done' || j.status === 'submitted') return 2; const s = stageOf(j, ctx); return s <= 2 ? 0 : s === 3 ? 1 : 2; };
-export const mine = (j, me) => (j.pm && j.pm.people || []).includes(me) || j.owner === me || (!(j.pm && j.pm.people || []).length && !j.owner);   // งานโครงเดิมไม่มีรายชื่อ = ยังแสดง
+export const mine = (j, me) => hasMe(j.pm && j.pm.people, me) || isMe(j.owner, me) || (!(j.pm && j.pm.people || []).length && !j.owner);   // งานโครงเดิมไม่มีรายชื่อ = ยังแสดง
 // เลยกำหนดส่ง (20 วันทำการหลังกลับ) กี่วัน · 0 = ยังไม่เลย/ไม่รู้วัน
 export const overdue = (j, today) => { if (j.status !== 'doing' || !j.dates) return 0; const d = deadline(j, today); return d.left < 0 ? -d.left : 0; };
 export const isReady = (j, ctx) => stageOf(j, ctx) === 4;

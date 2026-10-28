@@ -71,6 +71,25 @@ localStorage.removeItem('pms.session'); let hit = 0; globalThis.fetch = async (u
 const na = await store.listJobs().catch(x => x);
 ok(na.code === 'auth' && hit === 0, 'ไม่มี session → auth (ไม่ยิง anon)');
 
+// ---------- ชื่อเอกสาร · รวม PDF+ไฟล์แก้ได้ · ผู้ใช้ชื่อเต็มเทียบชื่อต้นในตาราง ----------
+{
+  const d = sh.doc({ code: 'FM-CE.SE-001', title: 'FM-CE.SE-001', file: 'ExFM-CESE-001ทะเบียนอุปกรณ์.pdf', rev: null, kind: 'FM' });
+  ok(d.title === 'ทะเบียนอุปกรณ์' && d.rev === '' && sh.doc(d).title === d.title, 'doc: title = รหัสอย่างเดียว → ชื่อจากชื่อไฟล์ (ตัดรหัสนำหน้า/นามสกุล) · เรียกซ้ำได้');
+  const x = sh.doc({ code: 'SD-CE.SE-86', title: 'SD-CE.SE-86 (ไฟล์แก้ได้ ไม่ได้ลิงก์บนหน้าเว็บ)', file: 'SD-CE.SE-86 แบบวงจร_Rev.04.docx', kind: 'SD' });
+  ok(x.title === 'แบบวงจร' && x.rev === '04', 'doc: หมายเหตุ "(ไฟล์แก้ได้…)" ไม่นับเป็นชื่อ · Rev.04 จากชื่อไฟล์เข้า rev');
+  ok(sh.doc({ code: 'WI-CE.SE-02', title: 'WI-CE.SE-02', file: 'WI-CESE-02วิธีตรวจ.pdf', rev: '07' }).rev === '07' && sh.doc({ code: 'QP-01', title: 'QP-01 งาน PM Rev.3' }).title === 'งาน PM', 'doc: rev ในฐานชนะ · title ที่มีชื่อแล้วตัดรหัสซ้ำ/Rev ออก');
+  const c = sh.cat({ id: 'fm', rows: [
+    { id: 1, code: 'FM-CE.SE-001', title: 'FM-CE.SE-001', file: 'ExFM-CESE-001ทะเบียนอุปกรณ์.pdf', storage_path: 'fm/001.pdf' },
+    { id: 2, code: 'FM-CE.SE-001', title: 'FM-CE.SE-001 (ไฟล์แก้ได้ ไม่ได้ลิงก์บนหน้าเว็บ)', file: 'ExFM-CESE-001ทะเบียนอุปกรณ์.docx', storage_path: 'fm/001.docx' },
+    { id: 3, code: 'FM-CE.SE-002', title: 'FM-CE.SE-002', file: 'ExFM-CESE-002ใบงาน.xlsx', storage_path: 'fm/002.xlsx' }] });
+  ok(c.rows.length === 2 && c.total === 2 && c.rows[0].storagePath === 'fm/001.pdf' && c.rows[0].editable.storagePath === 'fm/001.docx' && c.rows[0].editable.bucket === 'docs' && !c.rows[1].editable, 'cat: PDF+docx ของเอกสารเดียวกัน → แถวเดียว ดูด้วย PDF · editable = ไฟล์แก้ได้ · จำนวนหมวดนับหลังรวม');
+  const c2 = sh.cat({ id: 'fm', total: 95, rows: [{ id: 1, code: 'A', title: 'ก', file: 'a.pdf' }, { id: 2, code: 'A', title: 'ก', file: 'a.doc' }] });
+  ok(c2.total === 94, 'cat: total จาก backend ลดตามจำนวนที่รวม');
+  const rows = [{ people: ['สมหมาย'], id: 'a', ym: '2026-07' }, { people: ['วิชัย'], id: 'b', ym: '2026-07' }];
+  ok(F.isMe('สมหมาย', 'สมหมาย นุ๊ก สาสังข์') && F.isMe('นุ๊ก', 'สมหมาย นุ๊ก สาสังข์') && F.isMe('สมหมาย นุ๊ก สาสังข์', 'สมหมาย นุ๊ก สาสังข์') && F.isMe('สมหมาย', 'สมหมาย') && !F.isMe('วิชัย', 'สมหมาย นุ๊ก สาสังข์') && !F.isMe('สาสังข์', 'สมหมาย นุ๊ก สาสังข์') && !F.isMe('', ''), 'isMe: ชื่อเต็ม/ชื่อต้น/ชื่อเล่นตรง · คนอื่นและนามสกุลไม่ตรง');
+  ok(F.scheduleGroups(rows, [], '2026-07-10', 'สมหมาย นุ๊ก สาสังข์')[0][2][0].id === 'a' && F.mine({ pm: { people: ['สมหมาย'] } }, 'สมหมาย นุ๊ก สาสังข์') && !F.mine({ pm: { people: ['วิชัย'] } }, 'สมหมาย นุ๊ก สาสังข์'), 'ผู้ใช้ชื่อเต็ม: ตรงแถวตารางชื่อต้น · mine ตรง · คนอื่นไม่ตรง');
+}
+
 // ---------- ผลอ่านใบจดค่า/ฟอร์มจริงลายมือ → inspect() → apply202 (เส้นทางเติมเดิม) ----------
 {
   const { inspect, apply202 } = await import('../js/files.js');

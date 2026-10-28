@@ -46,7 +46,7 @@ const bkk = S => S.today;
 const DAYS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
 const ctxOf = S => ({ templates: S.templates, docs: S.docs, today: S.today });
 const sysName = (S, id) => (S.catalog.systems.find(s => s.id === id) || {}).name || id;
-const isMine = (S, d) => (d.performers || []).some(p => p === S.user.name || p === S.user.email) || (!!d.owner && d.owner === S.user.id);   // ฐานจริง: examples.uploaded_by = ผู้ใช้
+const isMine = (S, d) => (d.performers || []).some(p => F.isMe(p, S.user.name) || p === S.user.email) || (!!d.owner && d.owner === S.user.id);   // ฐานจริง: examples.uploaded_by = ผู้ใช้
 export const recent = S => S.jobs.filter(j => j.status !== 'done').sort((a, b) => b.touched.localeCompare(a.touched))[0];
 
 // ---------- วันนี้: แถวต่อหนึ่งงาน = เมื่อไร · งานไหน · ติดอะไร + แคปซูลเดียวพาไปจุดที่ติด (ไม่มีความคืบหน้าซ้ำ) ----------
@@ -55,7 +55,7 @@ const tRow = (when_, title, kind, text, href, cap, spot = '') => `<div class="ro
 export function today(S) {
   const cx = ctxOf(S), jobs = S.jobs.filter(j => F.mine(j, S.user.name) && j.status === 'doing').sort((a, b) => (a.dates ? a.dates[0] : '9').localeCompare(b.dates ? b.dates[0] : '9'));
   const opened = new Set(S.jobs.map(j => j.pm && j.pm.sched)), m0 = S.today.slice(0, 7);
-  const mineRows = F.scheduleGroups(S.sched, [...opened], S.today, S.user.name)[0][2].filter(r => r.people.includes(S.user.name));
+  const mineRows = F.scheduleGroups(S.sched, [...opened], S.today, S.user.name)[0][2].filter(r => F.hasMe(r.people, S.user.name));
   const rows = jobs.map(j => { const b = F.blocker(j, cx), ok = b.spot === 'cta', od = F.overdue(j, S.today); return tRow(od ? `⚠︎ เลยกำหนด ${od} วัน` : when(S, j), j.title, ok ? 'ok' : 'warn', b.text, `#/pm/${j.id}`, b.cap, b.spot); })
     .concat(mineRows.map(r => tRow(F.ymLabel(r.ym), F.rowTitle(r), 'todo', 'ยังไม่ได้เปิดงาน', `#/pm/new/${r.id}`, 'เปิดงาน')));
   const wd = DAYS[new Date(S.today + 'T00:00:00Z').getUTCDay()];
@@ -97,8 +97,9 @@ export function reports(S, _, back) {
 }
 
 // ---------- เอกสารเว็บกอง: 3 กลุ่ม → หมวด → ไฟล์ → ตัวดู ----------
-const fileRow = (S, f) => { const o = isOff(S, f.id);
-  return swr(`<a class="row" href="#/docs/k/${f.cat}/doc/${esc(f.id)}"><span class="rt"><span>${esc([f.code, f.title].filter(Boolean).join(' '))}</span><span class="sub">${[f.tag, f.rev && 'Rev.' + f.rev, f.fetchedAt && 'ดึง ' + dShort(f.fetchedAt)].filter(Boolean).join(' · ')}</span>${o ? st('dl', 'ตั้งไว้ (ตัวอย่าง)') : st('cloud', 'ยังไม่ตั้ง')}</span>${chev}</a>`, f.id, o); };
+const fileRow = (S, f) => { const o = isOff(S, f.id), demo = store.backendName() === 'demo';   // สถานะ offline เป็นฟีเจอร์ตัวอย่าง: โหมดจริงไม่แสดง
+  const row = `<a class="row" href="#/docs/k/${f.cat}/doc/${esc(f.id)}"><span class="rt"><span>${esc([f.code, f.title].filter(Boolean).join(' '))}</span><span class="sub">${[f.tag, f.rev && 'Rev.' + f.rev, f.fetchedAt && 'ดึง ' + dShort(f.fetchedAt)].filter(Boolean).join(' · ')}</span>${demo ? (o ? st('dl', 'ตั้งไว้ (ตัวอย่าง)') : st('cloud', 'ยังไม่ตั้ง')) : ''}</span>${chev}</a>`;
+  return demo ? swr(row, f.id, o) : row; };
 export const searchAll = (S, q) => {
   const rs = examples(S).filter(d => `${d.title} ${sysName(S, d.system)} ${d.round}`.toLowerCase().includes(q)), fs = S.files.filter(f => `${f.code} ${f.title} ${f.tag}`.toLowerCase().includes(q));
   return !rs.length && !fs.length ? '<div class="empty">ไม่พบเอกสาร</div>'
@@ -137,6 +138,9 @@ export const viewItem = (S, id) => S.docs.find(x => x.id === id) || S.files.find
 const isIOS = () => typeof navigator !== 'undefined' && (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform)));
 const WEB_NOTE = 'เปิดจากเว็บกอง (ต้องอยู่ในเน็ตบริษัท)';
 const extLink = (href, label, c = '') => `<a class="btn ${c}" href="${esc(href)}" target="_blank" rel="noopener">${ic('ext')}${label}</a>`;
+const kb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+const fext = it => (/\.([A-Za-z0-9]+)$/.exec(it.file || it.storagePath || '') || [])[1]?.toLowerCase() || '';
+const dlBtn = (href, label) => `<a class="btn" href="${esc(href)}" download>${ic('dl')}${label}</a>`;
 const openBtn = (S, id, it) => { const u = S.urls[id];
   if (u && u.url) return extLink(u.url, 'เปิดไฟล์ต้นฉบับ');
   if (it.sourceUrl) return `${extLink(it.sourceUrl, 'เปิดบนเว็บกอง')}<p class="sec note c">${WEB_NOTE}</p>`;
@@ -147,8 +151,10 @@ export function view(S, id, back) {
   const fake = typeof pg === 'number' && pg > 0 ? Array.from({ length: Math.min(pg, 200) }, (_, i) => `<div class="page"><div class="hd"><i></i><span>${esc(code)}${i ? ` · แผ่นที่ ${i + 1}` : ''}</span></div><div class="ln"></div>${i ? '' : '<div class="ln s"></div>'}</div>`).join('') : '';
   const badge = d && d.origin !== 'app' ? `<div class="vbd">${BADGE}</div>` : '';
   let body;
-  if (it.storagePath) body = `<div class="in" data-vfile>${badge}${u.url ? (isIOS() ? `<div class="grp"><div class="p16">${st('app', 'ไฟล์พร้อมเปิด')}</div></div><div class="pad2">${extLink(u.url, 'เปิดไฟล์ในแท็บใหม่')}</div>`
+  if (it.storagePath) body = `<div class="in" data-vfile>${badge}${u.url && fext(it) && fext(it) !== 'pdf' ? `<div class="grp"><div class="p16"><b>ไฟล์ ${esc(fext(it).toUpperCase())}</b>${it.size ? `<div class="sec">${kb(it.size)}</div>` : ''}<div class="sec">เปิดดูบนหน้าเว็บไม่ได้ · ดาวน์โหลดไปเปิดในเครื่อง</div></div></div><div class="pad2">${dlBtn(u.url, 'ดาวน์โหลด')}${it.sourceUrl ? extLink(it.sourceUrl, 'เปิดบนเว็บกอง', 'alt') : ''}</div>`
+      : u.url ? (isIOS() ? `<div class="grp"><div class="p16">${st('app', 'ไฟล์พร้อมเปิด')}</div></div><div class="pad2">${extLink(u.url, 'เปิดไฟล์ในแท็บใหม่')}</div>`
       : `<iframe class="vfile" src="${esc(u.url)}" title="${esc(title)}"></iframe><div class="pad2">${extLink(u.url, 'เปิดในแท็บใหม่', 'alt')}</div>`)
+    + (it.editable ? `<div class="pad2"><button class="btn alt" data-dl-ed="${esc(id)}">${ic('dl')}ดาวน์โหลดไฟล์แก้ได้ (Word/Excel)</button></div>` : '')
     : u.err ? `<div class="grp">${errBody(u.err, 'file:' + id)}</div><div class="pad2">${errMore([['ไฟล์', u.err]])}</div>${it.sourceUrl ? `<div class="pad2">${extLink(it.sourceUrl, 'เปิดบนเว็บกอง', 'alt')}<p class="sec note c">${WEB_NOTE}</p></div>` : ''}`
     : `<div class="grp"><div class="p16">${st('sync', 'กำลังเปิดไฟล์…')}</div></div>`}</div>`;
   else if (it.sourceUrl) body = `<div class="in"><div class="grp"><div class="p16">${st('web', WEB_NOTE)}</div></div><div class="pad2">${extLink(it.sourceUrl, 'เปิดบนเว็บกอง')}</div></div>${fake ? `<div class="pages" data-pg="${pg}">${badge}${fake}<div class="pgbar">หน้า <span id="pn">1</span>/${pg}</div></div>` : ''}`;
@@ -167,7 +173,7 @@ export function pm(S) {
   const my = S.jobs.filter(j => F.mine(j, me)), od = j => F.overdue(j, S.today), start = j => j.dates ? j.dates[0] : '9';
   const todo = my.filter(j => j.status === 'doing').sort((a, b) => od(b) - od(a) || start(a).localeCompare(start(b)));
   const wait = [...my.filter(j => j.status === 'submitted').map(j => jobRow(j, S)), ...S.docs.filter(d => isMine(S, d) && d.status !== 'accepted').map(d => docRow(S, d, '#/pm'))];
-  const next = F.scheduleGroups(S.sched, S.jobs.map(j => j.pm && j.pm.sched), S.today, me).slice(0, 2).flatMap(g => g[2].filter(r => r.people.includes(me)));
+  const next = F.scheduleGroups(S.sched, S.jobs.map(j => j.pm && j.pm.sched), S.today, me).slice(0, 2).flatMap(g => g[2].filter(r => F.hasMe(r.people, me)));
   const more = n => n > SCH_SHOW ? `<button class="row more" data-more>${ic('plus', 'lead')}<span class="rt"><span>ดูทั้งหมด ${n} งาน</span></span></button>` : '';
   const grp = (t, rows) => rows.length ? `<div class="sh">${t}</div><div class="grp">${rows.join('')}</div>` : '';
   const cur = `${errCard(S, ['jobs', 'templates'], 'งาน PM')}${grp('ต้องทำ', todo.map(j => jobRow(j, S)))}${grp('รอผู้ตรวจ', wait)}
@@ -181,7 +187,7 @@ export function pm(S) {
 // เลือกงานจากตาราง (ทั้งปี) · กรองตามศูนย์ · งานนอกตาราง
 export function pick(S, _, back) {
   const site = S.ui.site || '', seg = (v, t) => `<button data-site="${v}" aria-pressed="${site === v}">${t}</button>`;
-  const gs = F.scheduleGroups(S.sched.filter(r => r.people.includes(S.user.name) && (!site || r.site === site)), S.jobs.map(j => j.pm && j.pm.sched), S.today, S.user.name);
+  const gs = F.scheduleGroups(S.sched.filter(r => F.hasMe(r.people, S.user.name) && (!site || r.site === site)), S.jobs.map(j => j.pm && j.pm.sched), S.today, S.user.name);
   return `${nav('เลือกงาน', back, '', 'ค้นหางานในตาราง')}<div class="in"><h1 class="lt">เลือกงาน</h1><p class="sec note">เฉพาะงานที่คุณเป็นผู้ปฏิบัติ · ตาราง PM ปีงบ ${ORDER.fy} · ${ORDER.no}</p>
  <div class="seg scr" role="group" aria-label="ศูนย์">${seg('', 'ทั้งหมด')}${['DM', 'SB', 'MK', 'สถานี'].map(x => seg(x, x)).join('')}</div>
  ${gs.map(([t, ym, L]) => L.length ? `<div class="sh">${t}${ym ? ' · ' + F.ymLabel(ym) : ''} · ${L.length} งาน</div><div class="grp">${L.map(r => schedRow(r, t === 'ทั้งปี' ? F.ymLabel(r.ym) : '', '#/pm/pick')).join('')}</div>` : '').join('')}
