@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PMS</title>
+<meta name="theme-color">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PMS">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/icon-180.png">
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./ui/tokens.css">
+<link rel="stylesheet" href="./ui/base.css">
+</head>
+<body>
+<div id="app" class="login">
+ <!-- Sign in (English) -->
+ <section class="full" id="s-login" aria-label="Sign in">
+  <div class="logo">PMS</div>
+  <div><b>Preventive Maintenance System</b><div class="sec m">CE.SE · AEROTHAI</div></div>
+  <button class="btn" id="loginBtn"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="9" height="9"/><rect x="11" y="0" width="9" height="9"/><rect x="0" y="11" width="9" height="9"/><rect x="11" y="11" width="9" height="9"/></svg>Sign in with AEROTHAI account</button>
+  <p class="sec">Sign-in happens on the Microsoft page; the app never sees your password</p>
+  <p class="sec">Demo mode · sample data</p>
+ </section>
+ <section class="full" id="s-ms" aria-label="Simulated Microsoft page"><svg width="40" height="40" viewBox="0 0 20 20" aria-hidden="true"><rect width="9" height="9" style="fill:var(--ms-red)"/><rect x="11" width="9" height="9" style="fill:var(--ms-green)"/><rect y="11" width="9" height="9" style="fill:var(--ms-blue)"/><rect x="11" y="11" width="9" height="9" style="fill:var(--ms-yellow)"/></svg><b>Microsoft</b><span>Redirecting to login.microsoftonline.com…</span></section>
+
+ <!-- หน้าจอ: เนื้อหาวาดโดย js/views.js -->
+ <section class="screen root" id="s-home"></section>
+ <section class="screen root" id="s-docs"></section>
+ <section class="screen root" id="s-pm"></section>
+ <section class="screen root" id="s-man"></section>
+ <section class="screen root" id="s-me"></section>
+ <section class="screen push" id="s-years"></section>
+ <section class="screen push" id="s-rounds"></section>
+ <section class="screen push" id="s-view"></section>
+ <section class="screen push" id="s-fill"></section>
+ <section class="screen push" id="s-table"></section>
+ <section class="screen push" id="s-asset"></section>
+ <section class="screen push" id="s-tools"></section>
+ <section class="screen push" id="s-folder"></section>
+
+ <div id="kbar"><button data-nx="-1">‹ ก่อนหน้า</button><b id="kbl"></b><button data-nx="1">ถัดไป ›</button><button data-sheet="wi">ดู WI</button><button data-done>เสร็จ</button></div>
+
+ <nav class="tabbar" aria-label="เมนูหลัก">
+  <a href="#/home" aria-current="page"><svg class="ic"><use href="./ui/icons.svg#i-home"/></svg>หน้าหลัก</a>
+  <a href="#/docs"><svg class="ic"><use href="./ui/icons.svg#i-folder"/></svg>เอกสาร</a>
+  <a href="#/pm"><svg class="ic"><use href="./ui/icons.svg#i-clip"/></svg>งาน PM</a>
+  <a href="#/man"><svg class="ic"><use href="./ui/icons.svg#i-book"/></svg>คู่มือ</a>
+  <a href="#/me"><svg class="ic"><use href="./ui/icons.svg#i-user"/></svg>ฉัน</a>
+ </nav>
+
+ <div id="dim"></div>
+ <button class="toast" id="toast" role="status"><svg class="ic"><use href="./ui/icons.svg#i-info"/></svg><span></span></button>
+ <div class="bd" id="bd"></div>
+ <div class="sheet" id="sheet" role="dialog" aria-label="รายละเอียด"></div>
+</div>
+<input type="file" id="cam" accept="image/*" capture="environment" hidden>
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>
