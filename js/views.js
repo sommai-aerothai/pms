@@ -404,7 +404,7 @@ function users(S, _, back) {
   if (U.st === 'load') return `${head}<div class="grp"><div class="p16">${st('sync', 'กำลังโหลด…')}</div></div></div>`;
   const rows = U.rows.map(u => { const id = esc(u.id), mine = u.id === S.user.id;
     return `<div class="p16" data-uid="${id}"><div class="big">${esc(u.name || u.username)}</div><div class="sec">${esc(u.username)}${u.is_admin ? ' · แอดมิน' : ''}${mine ? ' · บัญชีของคุณ' : ''}${u.last_sign_in_at ? ' · เข้าล่าสุด ' + dFull(u.last_sign_in_at) : ' · ยังไม่เคยเข้า'}</div>${u.approved ? st('ok', 'ใช้งานอยู่') : st('warn', 'ปิดใช้งาน')}
- ${mine ? '' : `<div class="uact"><button class="btn sm alt" data-sheet="ureset:${id}">${ic('lock')}รีเซ็ตรหัส</button><button class="btn sm alt" data-u-set="${id}:${u.approved ? 0 : 1}">${ic(u.approved ? 'out' : 'done')}${u.approved ? 'ปิดการใช้งาน' : 'เปิดการใช้งาน'}</button></div>`}</div>`; }).join('');
+ ${mine || u.is_admin ? '' : `<div class="uact"><button class="btn sm alt" data-sheet="ureset:${id}">${ic('lock')}รีเซ็ตรหัส</button><button class="btn sm alt" data-u-set="${id}:${u.approved ? 0 : 1}">${ic(u.approved ? 'out' : 'done')}${u.approved ? 'ปิดการใช้งาน' : 'เปิดการใช้งาน'}</button></div>`}</div>`; }).join('');
   return `${head}<div class="pad2"><button class="btn" data-sheet="uadd">${ic('plus')}เพิ่มผู้ใช้</button></div><div class="sh">${U.rows.length} บัญชี</div><div class="grp">${rows || '<div class="empty">ยังไม่มีผู้ใช้</div>'}</div></div>`;
 }
 export { importScreen as import, sarabun, users };

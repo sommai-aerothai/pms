@@ -482,7 +482,7 @@ async function savePassword() {
 }
 
 // ---------- ผู้ใช้ (แอดมิน) ----------
-const UERR = { exists: 'ชื่อผู้ใช้นี้มีอยู่แล้ว', forbidden: 'บัญชีนี้ไม่มีสิทธิ์แอดมิน', notdeployed: 'ยังไม่ได้ตั้งค่าบนเซิร์ฟเวอร์ · ดู backend/edge/README.md',
+const UERR = { exists: 'ชื่อผู้ใช้นี้มีอยู่แล้ว', target_admin: 'จัดการบัญชีแอดมินในแอปไม่ได้', partial: 'สร้างไม่สำเร็จ และลบบัญชีที่ค้างไม่ได้ · ตรวจใน Dashboard › Authentication', forbidden: 'บัญชีนี้ไม่มีสิทธิ์แอดมิน', notdeployed: 'ยังไม่ได้ตั้งค่าบนเซิร์ฟเวอร์ · ดู backend/edge/README.md',
   username: 'ชื่อผู้ใช้ใช้ได้เฉพาะ a-z 0-9 . _ - ยาว 3-40 ตัว', name: 'กรอกชื่อ-นามสกุล', password: 'รหัสผ่านต้องยาวอย่างน้อย 10 ตัว' };
 const uerr = e => UERR[e.field] || UERR[e.code] || errWord(e);
 let ubusy = false;
@@ -505,13 +505,13 @@ async function addUser() {
   showPw(username, password); S.users = { st: 'load' }; fetchUsers();
 }
 async function resetUser(id) {
-  const password = $('#uPw').value, u = (S.users.rows || []).find(x => x.id === id); uSay('');
+  const password = $('#uPw').value, u = ((S.users && S.users.rows) || []).find(x => x.id === id); uSay('');
   if (!await userCmd('reset', { id, password }, uSay)) return;
   showPw(u ? u.username : '', password);
 }
 async function setUser(id, approved) {
   if (!await userCmd('set', { id, approved })) return;
-  const u = S.users.rows.find(x => x.id === id); if (u) u.approved = approved; S.rev++; draw(); toast(approved ? 'เปิดการใช้งานแล้ว' : 'ปิดการใช้งานแล้ว', 'ok');
+  const u = S.users && S.users.rows && S.users.rows.find(x => x.id === id); if (u) u.approved = approved; S.rev++; draw(); toast(approved ? 'เปิดการใช้งานแล้ว' : 'ปิดการใช้งานแล้ว', 'ok');
 }
 async function copyPw() {
   const t = $('#tmpPw').textContent;

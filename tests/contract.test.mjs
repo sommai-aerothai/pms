@@ -165,6 +165,8 @@ ok(na.code === 'auth' && hit === 0, 'ไม่มี session → auth (ไม่
     if (p !== '/functions/v1/admin-users') return json([]);
     if (mode === '404') return json({ code: 'NOT_FOUND', message: 'Requested function was not found' }, 404);
     if (mode === '403') return json({ error: 'forbidden' }, 403);
+    if (mode === 'ta') return json({ error: 'target_admin' }, 403);
+    if (mode === 'pt') return json({ error: 'partial' }, 500);
     if (mode === '409') return json({ error: 'exists' }, 409);
     if (mode === '400') return json({ error: 'username' }, 400);
     if (mode === 'nf') return json({ error: 'notfound' }, 404);
@@ -185,6 +187,8 @@ ok(na.code === 'auth' && hit === 0, 'ไม่มี session → auth (ไม่
   mode = '404'; ok(await code(() => store.adminUsers('list')) === 'notdeployed', '404 ของ gateway → notdeployed');
   mode = 'nf'; ok(await code(() => store.adminUsers('set', { id: 'a', approved: false })) === 'notfound', '404 ของฟังก์ชันเอง (ไม่พบบัญชี) ≠ notdeployed');
   mode = '403'; ok(await code(() => store.adminUsers('list')) === 'forbidden', '403 → forbidden (ไม่ใช่ auth: ห้ามเตะออกจากระบบ)');
+  mode = 'ta'; ok(await code(() => store.adminUsers('reset', { id: 'a', password: 'abcdefghij' })) === 'target_admin', '403 + target_admin → target_admin (ไม่ใช่ forbidden)');
+  mode = 'pt'; ok(await code(() => store.adminUsers('create', { username: 'a.b.c', name: 'x', password: 'abcdefghij' })) === 'partial', '500 + partial → partial');
   mode = '409'; ok(await code(() => store.adminUsers('list')) === 'exists', '409 → exists');
   mode = '400'; ok(await code(() => store.adminUsers('list')) === 'invalid:username', '400 + {error:username} → invalid:username');
   const pws = Array.from({ length: 200 }, () => store.genPassword());

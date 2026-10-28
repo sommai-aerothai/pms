@@ -51,7 +51,8 @@ export const adminUsers = async (action, body = {}) => {
     if (e.path !== '/functions/v1/admin-users') throw e;   // offline/server config ฯลฯ ที่ไม่ได้มาจากฟังก์ชัน
     const { code, retryAfter, ...m } = e;   // เก็บ status/path/detail ไว้วินิจฉัย (code ใหม่ต้องไม่ถูกทับ)
     if (e.status === 404 && e.detail !== 'notfound') fail('notdeployed', 0, m);
-    if (e.status === 403) fail('forbidden', 0, m);
+    if (e.status === 403) fail(e.detail === 'target_admin' ? 'target_admin' : 'forbidden', 0, m);   // target_admin = จัดการบัญชีแอดมินอื่นไม่ได้
+    if (e.detail === 'partial') fail('partial', 0, m);   // สร้างไม่สำเร็จและลบบัญชีครึ่งทางไม่ได้
     if (e.status === 409) fail('exists', 0, m);
     if (e.status === 400 || e.status === 413) fail('invalid', 0, { ...m, field: ['username', 'name', 'password'].includes(e.detail) ? e.detail : undefined });
     throw e;
