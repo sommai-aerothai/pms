@@ -2,7 +2,7 @@
    [ 14, 14 ],
    [ 283, 14 ],
    [ 14, 196 ],
-   [ 283, 196 ] ] }, "qr": { "x": 245, "y": 10, "size": 28, "quiet": 3 }, "rows": { "n": 11, "y0": 46, "pitch": 13, "txX": 20, "txW": 26, "label": "Tx" }, "box": { "w": 8.5, "h": 9.5, "dy": 1.75, "inset": 0.6 }, "circle": { "d": 4.4 }, "partW": { "b": 8.5, ".": 3, "-": 4.5, "p": 5, "m": 5 }, "fields": [
+   [ 283, 196 ] ] }, "qr": { "x": 241, "y": 5, "size": 33, "quiet": 3 }, "rows": { "n": 11, "y0": 46, "pitch": 13, "txX": 20, "txW": 26, "label": "Tx" }, "box": { "w": 8.5, "h": 9.5, "dy": 1.75, "inset": 0.6 }, "circle": { "d": 4.4 }, "partW": { "b": 8.5, ".": 3, "-": 4.5, "p": 5, "m": 5 }, "fields": [
   { "id": "error_hz", "label": "Error", "unit": "Hz", "x0": 48, "parts": "pmb.b" },
   { "id": "power_w", "label": "Power", "unit": "W", "x0": 83, "parts": "bb.b" },
   { "id": "spurious_dbc", "label": "Spurious", "unit": "dBc", "abs": true, "x0": 116.5, "parts": "-bb" },

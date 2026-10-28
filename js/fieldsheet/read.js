@@ -102,17 +102,21 @@ export function readCells(G, H, L, page, { white, black }) {
 
 export async function readFieldSheet(src, opts = {}) {
   const t0 = performance.now(), id = await toImageData(src, opts.max || 2400), jsQR = await loadJsQR();
-  let code = jsQR(id.data, id.width, id.height, { inversionAttempts: 'dontInvert' });
-  for (const f of [2, 3, 4]) {   // รูปมี noise: ย่อ (เฉลี่ย f×f) แล้วลองใหม่ แล้วคูณพิกัดกลับ
-    if (code) break;
+  // ถอด QR: ลองหลายระดับย่อ (เฉลี่ย f×f กัน noise) และรับเฉพาะ payload ที่เป็นของเรา (jsQR อาจคืนค่าขยะ/ว่างจากลายรบกวน)
+  const parse = d => { try { const m = JSON.parse(d); return m && m.v === 1 && typeof m.l === 'string' && typeof m.f === 'string' && Number.isInteger(m.p) ? m : null; } catch { return null; } };
+  const scaled = f => {
+    if (f === 1) return id;
     const w = Math.floor(id.width / f), h = Math.floor(id.height / f), d = new Uint8ClampedArray(w * h * 4), S = id.data, W = id.width;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) for (let c = 0; c < 4; c++) { let t = 0; for (let j = 0; j < f; j++) for (let i = 0; i < f; i++) t += S[((f * y + j) * W + f * x + i) * 4 + c]; d[(y * w + x) * 4 + c] = t / (f * f); }
-    const c2 = jsQR(d, w, h, { inversionAttempts: 'dontInvert' });
-    if (c2) { const l = c2.location; for (const k in l) if (l[k]?.x != null) l[k] = { x: l[k].x * f + f / 2, y: l[k].y * f + f / 2 }; code = c2; }
+    return { data: d, width: w, height: h };
+  };
+  let code = null, meta = null;
+  for (const inv of ['dontInvert', 'attemptBoth']) for (const f of [1, 2, 3, 4]) {
+    if (meta) break;
+    const im = scaled(f), c = jsQR(im.data, im.width, im.height, { inversionAttempts: inv }), m = c && parse(c.data);
+    if (m) { meta = m; code = c; if (f > 1) { const l = c.location; for (const k in l) if (l[k]?.x != null) l[k] = { x: l[k].x * f + f / 2, y: l[k].y * f + f / 2 }; } }
   }
   if (!code) return null;
-  let meta; try { meta = JSON.parse(code.data); } catch { return null; }
-  if (!meta || meta.v !== 1 || typeof meta.l !== 'string' || typeof meta.f !== 'string' || !Number.isInteger(meta.p)) return null;
   let L; try { L = await loadLayout(meta.l); } catch { return null; }
   const G = toGray(id), q = L.qr, loc = code.location;
   const H0 = solveH([[q.x, q.y], [q.x + q.size, q.y], [q.x + q.size, q.y + q.size], [q.x, q.y + q.size]],

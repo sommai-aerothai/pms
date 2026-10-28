@@ -32,8 +32,8 @@ for (let seed = 1; seed <= SEEDS; seed++) for (const page of [1, 2]) {
     }
   }
   const id = distort(base, R), res = await readFieldSheet(id);
-  if (!res) { readFail++; log(`p${page}/s${seed}: ไม่พบ QR`); continue; }
   if (q.has('show') && !res?.ok) { const cv = document.createElement('canvas'); cv.width = id.width; cv.height = id.height; cv.getContext('2d').putImageData(id, 0, 0); cv.style.width = '1100px'; document.body.append(cv); }
+  if (!res) { readFail++; log(`p${page}/s${seed}: ไม่พบ QR`); continue; }
   if (!res.ok) { readFail++; log(`p${page}/s${seed}: ${res.note} ${JSON.stringify(res.dbg)}`); continue; }
   times.push(res.ms);
   if (res.meta.j !== job || res.meta.f !== 'FM-202' || res.meta.p !== page || res.meta.l !== 'fm202-v1') metaBad++;
