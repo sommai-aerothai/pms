@@ -28,4 +28,6 @@ if (existsSync(f) && typeof DOMParser !== 'undefined') {   // reader ใช้ D
   ok(F.formProg(j, j.forms[0]).done === 0 && F.formProg(j, j.forms[0]).total === 168, 'ยืนยันแล้ว 0 / 168');
   const r = await inspect(new File([buf], 'x.xlsx'), j, { templates: [{ code: 'FM-CE.SE-202', rev: '04' }] }); ok(r.state === 'filled' && r.text.includes('Rev.04'), 'ผลไฟล์: เติมได้ + เตือน Rev ใหม่กว่า');
 } else console.log('SKIP ไม่มีไฟล์ตัวอย่างในเครื่องนี้');
+{ const a = F.normJob({ id: 'j', title: 'T', folder: { photos: [{ id: 'p1', name: 'a.jpg' }] } }), b = F.normJob(a), c = F.normJob({ ...b, files: [] });
+  ok(b.files.filter(f => f.id === 'p1').length === 1 && !('folder' in b) && c.files.length === 0, 'รูปโฟลเดอร์เดิม: ย้ายครั้งเดียว ไม่ซ้ำ · ลบแล้วไม่กลับมา'); }
 console.log(n + ' checks');
