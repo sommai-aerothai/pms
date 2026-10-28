@@ -1,0 +1,61 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>readers test</title>
+<pre id="out">running…</pre>
+<script type="module">
+// รัน: cd app-readers && python3 -m http.server 8099 → เปิด /tests/readers/readers.test.html (headless Chrome ได้)
+// fixtures/ = สังเคราะห์ (commit ได้) · samples/ = สำเนาไฟล์จริงในเครื่อง (ห้าม commit; ไม่มี = SKIP)
+import { readFile } from '../../js/readers/index.js';
+const out = document.getElementById('out'); let pass = 0, fail = 0, lines = [];
+const log = s => { lines.push(s); out.textContent = lines.join('\n'); };
+const ok = (c, name) => { c ? pass++ : fail++; log((c ? 'PASS ' : 'FAIL ') + name); };
+const val = (r, f) => r.values.find(v => v.field === f);
+const get = async (p, type) => { const r = await fetch(p); if (!r.ok) return null; return new File([await r.blob()], p.split('/').pop(), { type }); };
+const run = async (label, p, type) => { const f = await get(p, type); if (!f) { log('SKIP ' + label + ' (ไม่มีไฟล์ ' + p + ')'); return null; } const t0 = performance.now(); const r = await readFile(f); r.ms = Math.round(performance.now() - t0); log(`TIME ${label}: ${r.ms} ms · ${r.note}`); return r; };
+
+try {
+  // ---- สังเคราะห์ ----
+  let r = await run('synthetic FM-202', 'fixtures/fm202-synthetic.xlsx');
+  ok(r.kind === 'xlsx' && r.target.form === 'FM-CE.SE-202' && r.target.rev === '03', 'synthetic: ตรวจ FM-202 Rev.03');
+  ok(val(r, 'tx[1].power_w')?.value === 27.5 && val(r, 'tx[1].power_w').locator === 'Page 1!M9', 'synthetic: tx[1].power_w = 27.5 @ Page 1!M9');
+  ok(val(r, 'tx[7].freq_mhz')?.value === 132.05, 'synthetic: float artefact → 132.05');
+  ok(val(r, 'tx[7].power_w').value === 21 && val(r, 'tx[7].power_w').locator === 'Page 1!M15', 'synthetic: tx[7] M15');
+  ok(val(r, 'tx[17].error_adj_hz')?.value === -1.3 && val(r, 'tx[16].error_adj_hz') === undefined, 'synthetic: Adj "-" ข้าม, ค่าจริงเก็บ');
+  r = await run('synthetic csv', 'fixtures/sample.csv', 'text/csv');
+  ok(val(r, 'row[1].freq_mhz')?.value === 118.1 && val(r, 'row[1].Note')?.value === 'ok, fine', 'csv: header → field, quoted comma');
+  const legacy = await readFile(new File([new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0, 0, 0, 0])], 'a.xls'));
+  ok(legacy.kind === 'legacy' && legacy.note.includes('.docx/.xlsx'), 'legacy .xls');
+  ok((await readFile(new File([new Uint8Array(26 * 1048576)], 'big.pdf'))).note.includes('25 MB'), 'reject > 25 MB');
+  ok((await readFile(new File([new Uint8Array(4)], 'x.mp4', { type: 'video/mp4' }))).kind === 'unknown', 'video ไม่อ่าน');
+
+  // ---- ไฟล์จริง (local only) ----
+  r = await run('FM-202 จริง', 'samples/fm202.xlsx');
+  if (r) {
+    ok(r.target.form === 'FM-CE.SE-202' && r.target.rev === '03', 'real 202: form+rev');
+    const txs = new Set(r.values.map(v => /^tx\[(\d+)\]/.exec(v.field)?.[1]).filter(Boolean));
+    ok(txs.size === 21, 'real 202: 21 เครื่องส่ง (ได้ ' + txs.size + ')');
+    ok(val(r, 'tx[1].freq_mhz').value === 118.1 && val(r, 'tx[1].power_w').value === 27.5, 'real 202: Tx1 118.1 MHz / 27.5 W');
+    ok(val(r, 'tx[7].power_w').value === 22.6 && val(r, 'tx[7].power_w').locator === 'Page 1!M15', 'real 202: tx[7] M15 = 22.6');
+    ok(val(r, 'tx[21].power_w').locator === 'Page 2!M14', 'real 202: tx[21] Page 2!M14');
+    ok(val(r, 'tx[2].error_adj_hz').value === -0.9, 'real 202: J10 adj -0.9');
+  }
+  r = await run('FM-501 จริง', 'samples/fm501.xlsx');
+  if (r) ok(r.target.form === 'FM-CE.SE-501' && val(r, 'ant[1].vswr').value === 1.1 && r.values.filter(v => v.field.endsWith('.vswr')).length === 19, 'real 501: 19 VSWR, ant[1]=1.1');
+  r = await run('FM-502 จริง', 'samples/fm502.xlsx');
+  if (r) ok(r.target.form === 'FM-CE.SE-502' && val(r, 'battery.test_load_v[0]').value === 25.2 && val(r, 'ac_in_v').value === 235.4, 'real 502: battery 25.2 V, AC in 235.4 V');
+  r = await run('FM-001 จริง', 'samples/fm001.xlsx');
+  if (r) ok(r.target.form === 'FM-CE.SE-001' && val(r, 'asset[1].asset').value === '1-161-01195-0000' && r.values.filter(v => v.field.endsWith('.asset')).length >= 40, 'real 001: asset rows');
+  r = await run('docx FM-041 จริง', 'samples/fm041.docx');
+  if (r) ok(r.kind === 'docx' && r.text.length > 100, 'real docx: อ่านข้อความได้ · form=' + (r.target?.form || 'none'));
+  r = await run('PDF FM-005 จริง', 'samples/fm005.pdf');
+  if (r) ok(r.kind === 'pdf' && r.target?.form === 'FM-CE.SE-005' && r.target.page === 1, 'real pdf FM-005: form+page');
+  r = await run('PDF รวม 21 หน้า', 'samples/merged.pdf');
+  if (r) ok(r.kind === 'pdf' && r.forms.length >= 5 && r.values.length > 0 && r.values.every(v => v.page) && r.values.some(v => v.form === 'FM-CE.SE-040'), 'merged pdf (AcroForm ผูกหน้า ' + r.values.filter(v => v.page).length + '/' + r.values.length + '): ' + r.forms.map(f => f.form.slice(-3) + '@' + f.page).join(',') + ' · AcroForm ' + r.values.length);
+  r = await run('Spectrum จริง (OCR)', 'samples/spectrum.jpg', 'image/jpeg');
+  if (r) ok(r.target?.form === 'FM-CE.SE-204' && r.target.slot === 'UHF' && val(r, 'start_mhz')?.value === 230 && val(r, 'stop_mhz')?.value === 350, 'real spectrum: FM-204 UHF 230–350 · markers ' + r.values.filter(v => /^marker\[\d\]$/.test(v.field)).length);
+  r = await run('Asset sticker จริง (OCR)', 'samples/sticker.jpg', 'image/jpeg');
+  if (r) { log('KNOWN-WEAK sticker asset no.: ' + (r.values.filter(v => v.field.startsWith('asset')).map(v => v.value + ' (' + v.confidence + ')').join(', ') || 'อ่านไม่ได้') + ' · จริง = 101094 / 1-160-02230-0000'); ok(!!val(r, 'calibration_due'), 'real sticker: due date (medium ok)'); log('INFO sticker text: ' + r.text.replace(/\s+/g, ' ').slice(0, 200)); }
+} catch (e) { fail++; log('FAIL exception ' + (e.stack || e)); }
+log(`RESULT ${fail ? 'FAIL' : 'PASS'} · ${pass} pass · ${fail} fail`);
+document.title = fail ? 'FAIL' : 'PASS';
+</script>

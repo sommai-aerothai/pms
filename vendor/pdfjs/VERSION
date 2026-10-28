@@ -1,0 +1,8 @@
+pdfjs-dist 4.10.38 (legacy build, Apache-2.0) · npm pack 28 ต.ค. 2569 · ใช้ legacy/build เพื่อ Safari เก่า
+44ec6f011027ee77791386b66c14876a5fc29e20bf0433c07c6726fff7212b72  pdfjs/pdf.min.mjs
+bd88805178a26c729db8c0107a5b630cb900ec070f4d8c7529a3e45530afd41d  pdfjs/pdf.worker.min.mjs
+ 
+10174 LICENSE
+312 VERSION
+398237 pdf.min.mjs
+1417586 pdf.worker.min.mjs

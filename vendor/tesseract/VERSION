@@ -1,0 +1,19 @@
+tesseract.js 5.1.1 (Apache-2.0) + tesseract.js-core 5.1.1 (simd-lstm .wasm.js เท่านั้น — เครื่องไม่รองรับ WASM SIMD จะใช้ไม่ได้) + @tesseract.js-data eng/tha 4.0.0_best_int
+ce20eda9533cbed1e6c2b4276fbae1e0adc61b6754b5513084be601787b457cf  tesseract/tesseract-core-simd-lstm.wasm.js
+a8e29918d098b2b06e1012bdaeffb4aec0445c5d5654709023e0bd1f442a80e8  tesseract/tesseract.min.js
+aca1229639fc9907d86f96e825955a2b7c5716d17f3bc3acd71f9c7ab66181fc  tesseract/worker.min.js
+45b4cb346724ac1774f1c36f42f182b887bcdb28ebe63e6fff90ac41f3fcff91  tesseract/lang/eng.traineddata.gz
+4550a5505184d1b79cf10416d5b19e643001d95411d5e717954dd26feef3ae74  tesseract/lang/tha.traineddata.gz
+ 
+ 
+11357 LICENSE.md
+737 VERSION
+128 lang
+3938657 tesseract-core-simd-lstm.wasm.js
+66695 tesseract.min.js
+123724 worker.min.js
+ 
+ 
+ 
+2952873 eng.traineddata.gz
+896631 tha.traineddata.gz
