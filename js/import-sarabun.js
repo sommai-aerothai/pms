@@ -20,6 +20,7 @@ export function validate(m) {
   for (const k of ['printedAtISO', 'docDateISO']) { const v = d[k] ?? ''; if (typeof v !== 'string' || (v && !ISO.test(v))) return null; out[k] = v; }
   if (!/^https?:\/\//.test(out.url) || !out.regNo.trim()) return null;
   if (!Array.isArray(d.entries) || !Array.isArray(d.pdfLinks ?? [])) return null;
+  out.approved = d.approved === true;   // ตัวสร้างลิงก์คำนวณจากข้อความเต็มก่อนตัด
   out.trimmed = d.trimmed === true;   // คำสั่งลัดตัดข้อความยาวออกเพราะลิงก์ยาวเกิน
   out.entries = [];
   for (const e of d.entries.slice(0, MAX_ENTRIES)) {
@@ -74,7 +75,7 @@ export function applyImport(job, d, now) {
   const keys = [...TOP, 'docDateISO'], notice = Object.fromEntries(keys.map(k => [k, d[k]])); notice.entries = d.entries;
   const meta = { source: 'sarabun', locator: `worklog regNo ${d.regNo}`, extracted_at: now };
   // FM-040 อนุมัติ = สถานะเอกสารเสร็จแล้ว หรือมีบันทึกคำว่า "อนุมัติ" · ไม่แน่ใจ = ยังรอ (ผู้ใช้กดจำลอง/ยืนยันเอง)
-  const ok = /เสร็จ/.test(d.status) || d.entries.some(e => /อนุมัติ/.test(e.note));
+  const ok = /เสร็จ/.test(d.status) || d.approved === true || d.entries.some(e => /อนุมัติ/.test(e.note));
   return { ...job, data: { ...job.data, notice }, field_meta: { ...job.field_meta, ...Object.fromEntries(Object.keys(notice).map(k => ['notice.' + k, meta])) },
     f040: ok ? 'approved' : job.f040, draft: ok ? false : job.draft,
     vals: { ...(job.vals || {}), f040: { v: `${ok ? 'อนุมัติแล้ว' : 'รออนุมัติ'} · ${d.docNo || d.regNo}`, src: 'sarabun', loc: `บันทึกงาน เลขทะเบียน ${d.regNo}`, at: now.slice(0, 10) } } };
@@ -92,7 +93,7 @@ export const unstash = () => { try { sessionStorage.removeItem('pms.imp'); } cat
 export function init(onImport, onBad) {
   const take = v => { stash(v.data); onImport(v); };
   const frag = decodeFragment(location.hash);
-  if (/^#\/import\?/.test(location.hash)) { history.replaceState(null, '', '#/import'); frag ? take(frag) : onBad(); }   // ล้าง fragment ออกจาก URL ทันที
+  if (/^#\/import\?/.test(location.hash)) { const big = location.hash === '#/import?e=too-big'; history.replaceState(null, '', '#/import'); frag ? take(frag) : onBad(big ? 'too-big' : ''); }   // ล้าง fragment ออกจาก URL ทันที
   else if (location.hash === '#/import') { try { const v = validate({ type: 'pms-import', data: JSON.parse(sessionStorage.getItem('pms.imp')) }); if (v) onImport(v); } catch { /* ไม่มีของพัก */ } }
   // รับเฉพาะจากหน้าต่างที่เปิดเรามา (บุ๊กมาร์กเล็ตเปิดหน้าใหม่ทุกครั้ง)
   addEventListener('message', e => {

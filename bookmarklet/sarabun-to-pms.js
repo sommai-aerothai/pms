@@ -96,15 +96,23 @@
     for (i = 0; i < b.length; i++) r += String.fromCharCode(b[i]);
     return btoa(r).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
-  // ลิงก์ APP#/import?d=… · เกิน max ตัวอักษร: ตัดข้อความบันทึกงาน/หมายเหตุออก (เก็บช่องหลักครบ) แล้วถ้ายังเกินเหลือ 10 รายการแรก · ใส่ trimmed:true ให้หน้านำเข้าแจ้งผู้ใช้
+  // ลิงก์ APP#/import?d=… · เกิน max ตัวอักษร: ลดทีละขั้น (ตัดข้อความบันทึกงาน/หมายเหตุ → เหลือ 10/5/2/0 รายการ → ตัดช่องยาวให้สั้นลง) แล้วใส่ trimmed:true ให้หน้านำเข้าแจ้งผู้ใช้
+  // approved คำนวณจากข้อความเต็มก่อนตัดเสมอ (แอปใช้ตัดสินว่า FM-040 อนุมัติแล้ว) · ลดจนสุดแล้วยังไม่พอ = ลิงก์สั้น #/import?e=too-big
   function link(d, max) {
-    var e = b64url(JSON.stringify(d)), t;
-    if (e.length > max) {
-      t = JSON.parse(JSON.stringify(d));
+    var t = JSON.parse(JSON.stringify(d)), e = b64url(JSON.stringify(t)), steps, k;
+    function fits() { e = b64url(JSON.stringify(t)); return e.length <= max; }
+    function cap(o, keys, n) { keys.forEach(function (x) { if (typeof o[x] === 'string') o[x] = o[x].slice(0, n); }); }
+    t.approved = d.entries.some(function (x) { return /อนุมัติ/.test(x.note); });
+    if (!fits()) {
       t.trimmed = true;
       t.entries.forEach(function (x) { x.note = ''; x.remark = ''; });
-      e = b64url(JSON.stringify(t));
-      if (e.length > max) { t.entries = t.entries.slice(0, 10); e = b64url(JSON.stringify(t)); }
+      steps = [10, 5, 2, 0];
+      for (k = 0; k < steps.length && !fits(); k++) t.entries = t.entries.slice(0, steps[k]);
+      if (!fits()) {
+        cap(t, ['url', 'ref', 'from', 'to', 'subject', 'docType', 'docNo', 'status'], 200);
+        t.entries.forEach(function (x) { cap(x, ['unit', 'name', 'presenter'], 60); });
+      }
+      if (!fits()) return APP + '\x23/import?e=too-big';
     }
     return APP + '\x23/import?d=' + e;
   }

@@ -108,6 +108,20 @@ ok(imp.decodeFragment('#/import?d=' + enc({ ...d, trimmed: 'yes', evil: '<script
 { const w2 = (() => { const f2 = document.createElement('iframe'); document.body.append(f2); return f2; })(); w2.contentDocument.body.textContent = 'หน้าอื่น';
   const u2 = await runShortcut(w2.contentWindow, src); eq(imp.decodeFragment(u2.slice(u2.indexOf('#'))), null, 'หน้าที่ไม่ใช่สารบรรณ: ลิงก์ไม่ผ่านตัวตรวจ (แอปแจ้งข้อผิดพลาด)'); ok(u2.includes('#/import?e=1'), 'หน้าอื่น: ลิงก์ #/import?e=1'); }
 
+// ---- อนุมัติอยู่ในข้อความยาวเท่านั้น: หลังตัดข้อความแล้ว FM-040 ยังต้อง approved ----
+{ const ap = { ...structuredClone(d), status: 'รอ', entries: Array.from({ length: 30 }, (_, i) => ({ ...structuredClone(d.entries[0]), note: i === 29 ? 'อนุมัติ' + 'ยาว'.repeat(300) : 'ข้อความยาว'.repeat(300) })) };
+  const al = L(ap, 8000), av = imp.decodeFragment(al.slice(al.indexOf('#')));
+  ok(av && av.data.trimmed && av.data.approved === true && av.data.entries.every(e => e.note === ''), 'ตัดแล้วยังมี approved=true จากข้อความเต็ม');
+  eq(imp.applyImport({ data: {}, field_meta: {} }, av.data, '2026-10-28T00:00:00.000Z').f040, 'approved', 'applyImport: ตัดข้อความแล้ว f040 = approved');
+  const nl = L({ ...ap, entries: ap.entries.map(e => ({ ...e, note: 'x' })) }, Infinity);
+  eq(imp.applyImport({ data: {}, field_meta: {} }, imp.decodeFragment(nl.slice(nl.indexOf('#'))).data, '2026-10-28T00:00:00.000Z').f040, undefined, 'ไม่มีอนุมัติเลย = ไม่ approved'); }
+// ---- ข้อมูลผิดปกติ: ช่องยาวมาก ต้องไม่เกินเพดาน หรือแจ้ง too-big ----
+{ const fat = { ...structuredClone(d), url: d.url, subject: 'ก'.repeat(1900), ref: 'ข'.repeat(1900), from: 'ค'.repeat(1900), to: 'ง'.repeat(1900), entries: Array.from({ length: 50 }, () => ({ ...structuredClone(d.entries[0]), unit: 'ก'.repeat(1900), name: 'ข'.repeat(1900), presenter: 'ค'.repeat(1900) })) };
+  const fl = L(fat, 8000), fq = fl.slice(fl.indexOf('?') + 1);
+  ok(fq === 'e=too-big' || (fq.startsWith('d=') && fq.length - 2 <= 8000 && imp.decodeFragment(fl.slice(fl.indexOf('#'))) !== null), 'ช่องยาวมาก: ไม่เกินเพดาน หรือ e=too-big');
+  const tiny = L(fat, 300); eq(tiny.slice(tiny.indexOf('?') + 1), 'e=too-big', 'เพดานเล็กมาก → e=too-big');
+  ok(fq.startsWith('d=') && fl.length < 9000 || fq === 'e=too-big', 'ลิงก์ทั้งก้อนสั้นพอ'); }
+
 // ---- จับคู่งาน ----
 const systems = [{ id: 'tx-stby', name: 'DM TX Radio STBY' }, { id: 'tx-main', name: 'DM TX Radio Main' }, { id: 'vccs', name: 'DM VCCS' }, { id: 'vccs-bk', name: 'DM VCCS Backup' }];
 const jobs = [{ id: 'a', system: 'tx-stby', round: '2/69' }, { id: 'b', system: 'tx-stby', round: '1/70' }, { id: 'c', system: 'tx-main', round: '2/69' }, { id: 'e', system: 'vccs', round: '1/70' }, { id: 'f', system: 'vccs-bk', round: '1/70' }];
