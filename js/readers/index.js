@@ -62,6 +62,13 @@ async function pdf(file) {
 }
 
 async function image(file, ctx) {
+  // ใบจดค่าหน้างาน (มี QR ของเรา) → อ่านตัวเลขในเครื่อง · ไม่ใช่ → OCR เดิม
+  const fs = await import('../fieldsheet/read.js').then(m => m.readFieldSheet(file)).catch(() => null);
+  if (fs) {
+    const n = fs.values.filter(v => v.value != null).length, low = fs.values.length - n, t = { form: fs.meta.f, page: fs.meta.p, job: fs.meta.j };
+    return res('image', { target: t, values: fs.values, confidence: !fs.ok ? 'low' : low ? 'medium' : 'high', subkind: 'fieldsheet',
+      note: fs.ok ? `✍ ใบจดค่าหน้างาน ${t.form} หน้า ${t.page} · อ่านได้ ${n} ค่า${low ? ` · ${low} ค่าต้องตรวจเอง` : ''}` : '✍ ใบจดค่าหน้างาน · ' + fs.note });
+  }
   const { readImage } = await import('./image.js');
   const r = await readImage(file, ctx);
   return res('image', { target: r.target, values: r.values, text: r.text, confidence: r.confidence, note: r.note, subkind: r.kind });

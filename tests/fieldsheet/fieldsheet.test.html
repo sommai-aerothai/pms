@@ -1,0 +1,56 @@
+<!doctype html><meta charset="utf-8"><title>fieldsheet test</title>
+<pre id="out">running…</pre>
+<script type="module">
+// ใบจดค่า FM-202: render → วางลายมือ MNIST → บิดภาพ → อ่าน · ผ่านเมื่อตัวเลขถูก ≥95% และ metadata ถูกทุกใบ
+// ?pdf=1 : ใช้ภาพ .tmp/p-<n>.png ที่ได้จาก print-to-pdf + pdftoppm แทน SVG raster (รัน run.sh)
+import { loadLayout, cells } from '../../js/fieldsheet/layout.js';
+import { sheetSvg } from '../../js/fieldsheet/print.js';
+import { readFieldSheet } from '../../js/fieldsheet/read.js';
+import { loadDigits, classify } from '../../js/fieldsheet/digits.js';
+import { rng, loadSprite, rasterSvg, paste, fillCircle, distort } from './synth.js';
+const out = [], log = s => { out.push(s); document.getElementById('out').textContent = out.join('\n'); };
+const q = new URLSearchParams(location.search), usePdf = q.has('pdf'), SEEDS = +q.get('seeds') || 3;
+const L = await loadLayout('fm202-v1'), sprite = await loadSprite(), job = 'JOB-2569-02';
+const txs = Array.from({ length: 21 }, (_, i) => ({ no: i + 1, freq: 118 + i * 1.325 }));
+let dOK = 0, dN = 0, fOK = 0, fN = 0, fNull = 0, fWrong = 0, metaBad = 0, readFail = 0; const times = [];
+for (let seed = 1; seed <= SEEDS; seed++) for (const page of [1, 2]) {
+  const R = rng(seed * 100 + page), K = 7;
+  let base;
+  if (usePdf) { const im = new Image(); im.src = `./.tmp/p-${page}.png`; await im.decode(); base = document.createElement('canvas'); base.width = im.width; base.height = im.height; base.getContext('2d').drawImage(im, 0, 0); }
+  else base = await rasterSvg(sheetSvg(L, { job, page, txs }), 297 * K, 210 * K);
+  const k = base.width / 297, g = base.getContext('2d'), truth = {};
+  const nrows = Math.min(L.rows.n, txs.length - (page - 1) * L.rows.n);
+  for (let r = 0; r < nrows; r++) {
+    const no = (page - 1) * L.rows.n + r + 1, cs = cells(L, r);
+    for (const f of L.fields) {
+      const fc = cs.filter(c => c.field === f.id && c.t === 'b'), digs = fc.map(() => (R() * 10) | 0);
+      fc.forEach((c, i) => paste(g, sprite, digs[i], c, k, R));
+      const neg = f.parts.includes('-') || (f.parts.includes('m') && R() < .5);
+      if (f.parts.includes('m')) fillCircle(g, cs.find(c => c.field === f.id && c.t === (neg ? 'm' : 'p')), k, R);
+      truth[`tx[${no}].${f.id}`] = { digs: digs.join(''), neg };
+    }
+  }
+  const id = distort(base, R), res = await readFieldSheet(id);
+  if (!res) { readFail++; log(`p${page}/s${seed}: ไม่พบ QR`); continue; }
+  if (q.has('show') && !res?.ok) { const cv = document.createElement('canvas'); cv.width = id.width; cv.height = id.height; cv.getContext('2d').putImageData(id, 0, 0); cv.style.width = '1100px'; document.body.append(cv); }
+  if (!res.ok) { readFail++; log(`p${page}/s${seed}: ${res.note} ${JSON.stringify(res.dbg)}`); continue; }
+  times.push(res.ms);
+  if (res.meta.j !== job || res.meta.f !== 'FM-202' || res.meta.p !== page || res.meta.l !== 'fm202-v1') metaBad++;
+  const got = Object.fromEntries(res.values.map(v => [v.field, v]));
+  for (const [key, t] of Object.entries(truth)) {
+    const v = got[key], rd = v ? v.raw.replace(/[^0-9?]/g, '') : '';
+    for (let i = 0; i < t.digs.length; i++) { dN++; if (rd[i] === t.digs[i]) dOK++; else if (q.has('v')) log(`  ${key} ${t.digs} ≠ ${v ? v.raw : '-'} (${v?.confidence})`); }
+    fN++;
+    const f = L.fields.find(f => key.endsWith('.' + f.id)), s = f.parts.replace(/[pm]/g, '').replace('-', '');
+    let str = ''; { let j = 0; for (const c of s) str += c === '.' ? '.' : t.digs[j++]; }
+    const want = (t.neg ? -1 : 1) * parseFloat(str);
+    if (v && v.value === want) fOK++; else if (v && v.value == null) fNull++; else fWrong++;
+  }
+}
+const dAcc = dOK / dN, fAcc = fOK / fN, ms = times.reduce((a, b) => a + b, 0) / (times.length || 1);
+log(`ตัวเลขถูก ${dOK}/${dN} = ${(dAcc * 100).toFixed(2)}%`);
+log(`ค่าครบทั้งฟิลด์ถูก ${fOK}/${fN} = ${(fAcc * 100).toFixed(1)}% · null(ถามผู้ใช้) ${fNull} · ผิดแบบมั่นใจ ${fWrong}`);
+log(`metadata ผิด ${metaBad} · อ่านไม่ได้ ${readFail} · เวลา/หน้า เฉลี่ย ${ms.toFixed(0)} ms (สูงสุด ${Math.max(...times, 0).toFixed(0)})`);
+const pass = dAcc >= 0.95 && !metaBad && !readFail;
+log(pass ? 'PASS' : 'FAIL'); document.title = pass ? 'PASS' : 'FAIL'; console.log('FS-DONE\n' + out.join('\n'));
+</script>

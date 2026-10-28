@@ -1,0 +1,12 @@
+{ "id": "fm202-v1", "form": "FM-202", "formName": "FM-CE.SE-202 PM Tx Radio", "unit": "mm", "page": { "w": 297, "h": 210 }, "marks": { "size": 8, "centres": [
+   [ 14, 14 ],
+   [ 283, 14 ],
+   [ 14, 196 ],
+   [ 283, 196 ] ] }, "qr": { "x": 245, "y": 10, "size": 28, "quiet": 3 }, "rows": { "n": 11, "y0": 46, "pitch": 13, "txX": 20, "txW": 26, "label": "Tx" }, "box": { "w": 8.5, "h": 9.5, "dy": 1.75, "inset": 0.6 }, "circle": { "d": 4.4 }, "partW": { "b": 8.5, ".": 3, "-": 4.5, "p": 5, "m": 5 }, "fields": [
+  { "id": "error_hz", "label": "Error", "unit": "Hz", "x0": 48, "parts": "pmb.b" },
+  { "id": "power_w", "label": "Power", "unit": "W", "x0": 83, "parts": "bb.b" },
+  { "id": "spurious_dbc", "label": "Spurious", "unit": "dBc", "x0": 116.5, "parts": "-bb" },
+  { "id": "mod_pct", "label": "Mod", "unit": "%", "x0": 143, "parts": "bb.b" },
+  { "id": "sens_dbm", "label": "Sensitivity", "unit": "dBm", "x0": 176.5, "parts": "-bbb" },
+  { "id": "distn_pct", "label": "Distn", "unit": "%", "x0": 211.5, "parts": "b.b" },
+  { "id": "timeout_s", "label": "Time out", "unit": "s", "x0": 236.5, "parts": "bbb" } ] }

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ใบจดค่าหน้างาน</title>
+<link rel="stylesheet" href="./ui/tokens.css">
+<style>
+@page{size:A4 landscape;margin:0}
+body{margin:0;background:var(--paper-bg);font:var(--fs-body)/1.4 system-ui,'Noto Sans Thai',sans-serif;color:var(--text)}
+.bar{display:flex;gap:var(--space-3);align-items:center;padding:var(--space-3) var(--space-4);background:var(--bar)}
+.bar button{min-height:var(--tap);padding:0 var(--space-5);border:0;border-radius:var(--radius-control);background:var(--accent);color:var(--accent-on-fill);font:inherit}
+.page{width:297mm;height:210mm;margin:var(--space-4) auto;background:var(--white);box-shadow:var(--shadow-paper);break-after:page}
+.page svg{display:block}
+@media print{body{background:var(--white)}.bar{display:none}.page{margin:0;box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="bar"><button id="print">พิมพ์</button><span id="info"></span></div>
+<main id="pages"></main>
+<script type="module">
+// ?job=<id>&form=FM-202[&n=21][&freqs=132.05,133.3,…][&page=1]
+import { loadLayout } from './js/fieldsheet/layout.js';
+import { sheetSvg, pageCount } from './js/fieldsheet/print.js';
+const LAYOUTS = { 'FM-202': 'fm202-v1' };   // เพิ่ม FM-501/FM-502 ที่นี่เมื่อมี layout
+const q = new URLSearchParams(location.search), job = q.get('job') || 'demo', form = q.get('form') || 'FM-202';
+const L = await loadLayout(LAYOUTS[form] || '');
+const freqs = (q.get('freqs') || '').split(',').filter(Boolean).map(Number), n = Math.max(1, Math.min(200, +q.get('n') || freqs.length || 21));
+const txs = Array.from({ length: n }, (_, i) => ({ no: i + 1, freq: freqs[i] ?? null }));
+const total = pageCount(L, n), only = +q.get('page') || 0;
+document.getElementById('pages').innerHTML = Array.from({ length: total }, (_, i) => i + 1).filter(p => !only || p === only)
+  .map(p => `<section class="page">${sheetSvg(L, { job, page: p, txs, uid: 'p' + p })}</section>`).join('');
+document.getElementById('info').textContent = `${form} · งาน ${job} · ${n} เครื่อง · ${total} หน้า · พิมพ์ A4 แนวนอน 100% (ไม่ย่อ)`;
+document.getElementById('print').onclick = () => print();
+</script>
+</body>
+</html>
