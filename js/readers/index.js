@@ -71,7 +71,7 @@ async function image(file, ctx) {
   }
   const { readImage } = await import('./image.js');
   const r = await readImage(file, ctx);
-  if (!r.target) {   // ไม่ใช่ใบจดค่า/สติกเกอร์/จอวัด → ลองฟอร์มทางการที่เขียนมือ (FM-202) · แม่นยำต่ำกว่าใบจดค่า จึงไม่ให้ confidence high
+  if (!r.target || /202/.test(r.target.form || '')) {   // ไม่ใช่ใบจดค่า/สติกเกอร์/จอวัด → ลองฟอร์มทางการที่เขียนมือ (FM-202) · แม่นยำต่ำกว่าใบจดค่า จึงไม่ให้ confidence high
     const o = await import('../fieldsheet/official.js').then(m => m.readOfficial(file, { ocr: true })).catch(() => null);
     if (o?.ok && o.values.length) {
       const n = o.values.filter(v => v.value != null).length;

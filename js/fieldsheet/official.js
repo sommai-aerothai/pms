@@ -149,6 +149,7 @@ export async function readOfficial(src, { page, ocr, layoutId = 'fm202-official'
   await loadDigits();
   let ident = null;
   if (ocr) { try { ident = await (typeof ocr === 'function' ? ocr : identifyByOcr)(G, reg.H, L, id); } catch (e) { ident = { error: String(e) }; } }
+  if (ident && !ident.error && ident.form !== 'FM-202') return { ok: false, meta: { ident }, values: [], note: 'ตัวพิมพ์ไม่ใช่ FM-202 · ไม่อ่านค่า', ms: performance.now() - t0 };
   const p = ident?.page || page;
   const meta = { form: 'FM-202', rev: L.rev, page: p, ident };
   if (!p) return { ok: false, meta, values: [], note: 'ไม่รู้ว่าเป็นหน้าไหน (ส่ง page หรือเปิด OCR)', reg, ms: performance.now() - t0 };

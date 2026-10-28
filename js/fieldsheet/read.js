@@ -87,7 +87,7 @@ export function readCells(G, H, L, page, { white, black }) {
       for (const t of toks) {
         if (t.t === '.') { str += '.'; raw += '.'; seenDot = true; continue; }
         if (t.t !== 'b') continue;
-        if (t.empty) { if (!seenDigit && !seenDot) { str += '0'; raw += '0'; } else { bad = true; raw += '?'; } continue; }
+        if (t.empty) { if (!seenDigit && !seenDot) { str += '0'; raw += '0'; if (rank[conf] > 1) conf = 'medium'; }   // ช่องหน้าว่าง = 0 แต่ไม่ให้ high (อาจเป็นลายจางที่มองไม่เห็น) else { bad = true; raw += '?'; } continue; }
         seenDigit = true; str += t.digit; raw += t.digit;
         const c = confOf(t.p); if (rank[c] < rank[conf]) conf = c;
       }
