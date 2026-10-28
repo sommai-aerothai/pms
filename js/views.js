@@ -50,7 +50,7 @@ export const recent = S => S.jobs.filter(j => j.status !== 'done').sort((a, b) =
 
 // ---------- วันนี้: แถวต่อหนึ่งงาน = เมื่อไร · งานไหน · ติดอะไร + แคปซูลเดียวพาไปจุดที่ติด (ไม่มีความคืบหน้าซ้ำ) ----------
 const when = (S, j) => { if (!j.dates) return j.pm.ym ? F.ymLabel(j.pm.ym) : 'ยังไม่กำหนดวัน'; const [a, b] = j.dates, d = F.daysUntil(a, S.today); return d === 1 ? 'พรุ่งนี้' : d === 0 ? 'วันนี้' : d < 0 && F.daysUntil(b, S.today) >= 0 ? 'กำลังปฏิบัติงาน' : d < 0 ? 'เลยกำหนดวันงาน' : dShort(a); };
-const tRow = (when_, title, kind, text, href, cap, spot = '') => `<div class="row tr"><span class="rt"><span class="cap">${esc(when_)}</span><b>${esc(title)}</b>${st(kind, text)}</span><a class="btn sm" href="${href}"${spot ? ` data-spot="${esc(spot)}"` : ''}>${esc(cap)}</a></div>`;
+const tRow = (when_, title, kind, text, href, cap, spot = '') => `<div class="row tr"><span class="rt"><span class="cap">${esc(when_)}</span><b>${esc(F.fmtTitle(title))}</b>${st(kind, text)}</span><a class="btn sm" href="${href}"${spot ? ` data-spot="${esc(spot)}"` : ''}>${esc(cap)}</a></div>`;
 export function today(S) {
   const cx = ctxOf(S), jobs = S.jobs.filter(j => F.mine(j, S.user.name) && j.status === 'doing').sort((a, b) => (a.dates ? a.dates[0] : '9').localeCompare(b.dates ? b.dates[0] : '9'));
   const opened = new Set(S.jobs.map(j => j.pm && j.pm.sched)), m0 = S.today.slice(0, 7);
@@ -68,7 +68,7 @@ const RB = '#/docs/reports';
 const BADGE = '<span class="bdg">ตัวอย่าง</span>';
 const DOC_ST = { draft: ['todo', 'ร่าง'], review: ['todo', 'รอตรวจ'], accepted: ['ok', 'ผู้ตรวจรับแล้ว'] };
 const origin = d => d.origin === 'app' ? st('app', 'ที่ออกจากแอป') : BADGE;
-const docRow = (S, d, base) => swr(`<a class="row" href="${base}/doc/${d.id}"><span class="rt"><span>${esc(d.title)}</span><span class="sub">${d.dates ? dRange(d.dates) + ' · ' : ''}${d.pages} หน้า · ผู้ปฏิบัติ ${d.crew} คน</span><span class="stl">${st(...DOC_ST[d.status])}${origin(d)}</span></span>${chev}</a>`, d.id, isOff(S, d.id));
+const docRow = (S, d, base) => swr(`<a class="row" href="${base}/doc/${d.id}"><span class="rt"><span>${esc(F.fmtTitle(d.title))}</span><span class="sub">${d.dates ? dRange(d.dates) + ' · ' : ''}${d.pages} หน้า · ผู้ปฏิบัติ ${d.crew} คน</span><span class="stl">${st(...DOC_ST[d.status])}${origin(d)}</span></span>${chev}</a>`, d.id, isOff(S, d.id));
 export const isOff = (S, id) => { const t = S.files.find(x => x.id === id) || S.templates.find(x => x.code === id); return store.isOffline(id, t ? t.offline !== false : false); };
 const roundsList = (S, list, base) => list.length ? list.map(d => docRow(S, d, base)).join('') : '<div class="empty">ไม่มีรายงานในหมวดนี้</div>';
 const examples = S => S.docs.filter(d => !isMine(S, d));   // รายงานของฉันอยู่ที่ งาน PM › ย้อนหลัง เท่านั้น
@@ -127,7 +127,7 @@ export function rounds(S, arg, back) {
 }
 export function view(S, id, back) {
   const d = S.docs.find(x => x.id === id), t = S.files.find(x => x.id === id) || S.templates.find(x => x.code === id);
-  const title = d ? d.title : [t.code, t.title || t.name, t.rev && 'Rev.' + t.rev].filter(Boolean).join(' '), pg = d ? d.pages : t.pages, code = d ? 'FM-CE.SE-006' : t.code || t.title;
+  const title = d ? F.fmtTitle(d.title) : [t.code, t.title || t.name, t.rev && 'Rev.' + t.rev].filter(Boolean).join(' '), pg = d ? d.pages : t.pages, code = d ? 'FM-CE.SE-006' : t.code || t.title;
   const pages = Array.from({ length: Math.min(pg, 200) }, (_, i) => `<div class="page"><div class="hd"><i></i><span>${esc(code)}${i ? ` · แผ่นที่ ${i + 1}` : ''}</span></div><div class="ln"></div>${i ? '' : '<div class="ln s"></div>'}</div>`).join('');
   return `${nav(title, back, `<button data-sheet="${d ? 'info' : 'src'}:${esc(id)}" aria-label="ข้อมูลรายงาน">${ic('info')}</button><button data-share aria-label="แชร์">${ic('share')}</button>`)}
  <div class="pages" data-pg="${pg}">${d && d.origin !== 'app' ? `<div class="vbd">${BADGE}</div>` : ''}${pages}<div class="pgbar">หน้า <span id="pn">1</span>/${pg}</div></div>`;
@@ -137,7 +137,7 @@ export function view(S, id, back) {
 const SITE = { DM: 'DM ดอนเมือง', SB: 'SB สุวรรณภูมิ', MK: 'MK ทุ่งมหาเมฆ', 'สถานี': 'สถานี (RCAG · หอฯ)' };
 const schedRow = (r, extra = '', base = '#/pm/new') => `<a class="row" href="${base}/${r.id}"><span class="rt"><span>${esc(F.rowTitle(r))}</span><span class="sub">${[extra, r.rotate ? F.rowDur(r) : `ครั้งที่ ${r.round}/${String(ORDER.fy).slice(2)} · ${F.rowDur(r)}`, r.people.join(', ')].filter(Boolean).join(' · ')}</span><span class="src">${ic('web')}เว็บกอง</span></span>${chev}</a>`;
 const jobRow = (j, S) => { const cx = ctxOf(S), p = F.jobProg(j), s = F.stageOf(j, cx);
-  return `<a class="row" href="#/pm/${j.id}"${S.ui.added === j.id ? ' data-new' : ''}>${ring(j.status === 'done' ? 1 : p.frac, `ความคืบหน้าฟอร์ม ${F.formsDone(j)}/${j.forms.length}`)}<span class="rt"><span>${esc(j.title)}</span><span class="sub">${j.dates ? dRange(j.dates) : j.pm.ym ? F.ymLabel(j.pm.ym) : ''}</span>${F.overdue(j, S.today) ? st('warn', `เลยกำหนด ${F.overdue(j, S.today)} วัน`) : ''}<span class="sub rsn">${esc(F.rowReason(j, cx))}</span></span>${chev}</a>`; };
+  return `<a class="row" href="#/pm/${j.id}"${S.ui.added === j.id ? ' data-new' : ''}>${ring(j.status === 'done' ? 1 : p.frac, `ความคืบหน้าฟอร์ม ${F.formsDone(j)}/${j.forms.length}`)}<span class="rt"><span>${esc(F.fmtTitle(j.title))}</span><span class="sub">${j.dates ? dRange(j.dates) : j.pm.ym ? F.ymLabel(j.pm.ym) : ''}</span>${F.overdue(j, S.today) ? st('warn', `เลยกำหนด ${F.overdue(j, S.today)} วัน`) : ''}<span class="sub rsn">${esc(F.rowReason(j, cx))}</span></span>${chev}</a>`; };
 const SCH_SHOW = 3;
 export function pm(S) {
   const cx = ctxOf(S), me = S.user.name, top = S.ui.pmt || 'pm-cur', seg = (id, t) => `<button data-pane="${id}" aria-pressed="${top === id}">${t}</button>`;
@@ -268,7 +268,7 @@ export function job(S, id, back) {
  <!-- fieldsheet-print-slot: ปุ่ม "พิมพ์ใบจดค่า" (lane 5 เสียบหลัง PR นี้ merge) -->
  ${(j.files || []).length ? fileRows(S, j) : `<div class="row"><span class="sec">ยังไม่มีไฟล์ · แนบฟอร์มที่กรอกในคอม (.xlsx .docx) รูป หรือ PDF · ไม่รับวิดีโอ</span></div>`}</div>
  <div class="grp card"><div class="gh">ฟอร์ม<span class="sub">ตามขอบเขต WI · ${nPend ? `เติมจากไฟล์แล้ว รอยืนยัน ${nPend} ช่อง` : 'ไฟล์เติมให้ก่อน ที่เหลือกรอกเอง'}</span></div>${forms}
- <button class="row" data-sheet="example"><span class="rt"><span class="cap">ตัวอย่างรายงานที่ใช้เทียบ</span><span>${ex ? esc(ex.title) : 'ยังไม่มีตัวอย่าง'} · <b class="lnk">เปลี่ยน</b></span></span>${chev}</button></div>
+ <button class="row" data-sheet="example"><span class="rt"><span class="cap">ตัวอย่างรายงานที่ใช้เทียบ</span><span>${ex ? esc(F.fmtTitle(ex.title)) : 'ยังไม่มีตัวอย่าง'} · <b class="lnk">เปลี่ยน</b></span></span>${chev}</button></div>
  ${detail}</div>`;
 }
 
@@ -334,7 +334,7 @@ function importScreen(S, _, back) {
   const d = I.data, j = impTarget(S), row = !j && F.matchRow(S.sched.filter(r => !S.jobs.some(x => x.pm && x.pm.sched === r.id)), d.subject, norm, roundOf), kv = ([l, v]) => `<div class="kv"><span>${l}</span><span>${esc(v)}</span></div>`;
   const rows = [['เลขทะเบียน', d.regNo], ['เลขที่เอกสาร', d.docNo], ['ลงวันที่', d.docDate], ['ประเภทเอกสาร', d.docType], ['สถานะ', d.status], ['จาก', d.from], ['ถึง', d.to], ['อ้างถึง', d.ref], ['เรื่อง', d.subject]].filter(r => r[1]);
   const ents = d.entries.map(e => `<div class="row"><span class="rt"><span>${esc(e.unit || e.name)}</span><span class="sub">${esc(e.at)}${e.note ? ' · ' + esc(cut(e.note, 90)) : ''}</span></span></div>`).join('');
-  const m = j ? `<button class="row" data-sheet="impjob">${ic('clip', 'lead')}<span class="rt"><span>จับคู่กับงาน: ${esc(j.title)}</span><span class="sub">แตะเพื่อเปลี่ยน</span></span>${chev}</button>`
+  const m = j ? `<button class="row" data-sheet="impjob">${ic('clip', 'lead')}<span class="rt"><span>จับคู่กับงาน: ${esc(F.fmtTitle(j.title))}</span><span class="sub">แตะเพื่อเปลี่ยน</span></span>${chev}</button>`
     : row ? `<a class="row" href="#/pm/new/${row.id}">${ic('plus', 'lead')}<span class="rt"><span>งานนี้ยังไม่ได้เปิด · ตรงกับตาราง PM</span><span class="sub">${esc(F.rowTitle(row))} · แตะเพื่อเปิดงานพร้อมข้อมูลนี้</span></span>${chev}</a>`
     : `<button class="row" data-sheet="impjob">${ic('warn', 'lead w')}<span class="rt"><span>ยังไม่พบงานที่ตรงกับหัวเรื่อง</span><span class="sub">แตะเพื่อเลือกงานเอง</span></span>${chev}</button>`;
   return `${head}<div class="grp"><div class="kv"><span>ที่มา</span>${st('app', 'สารบรรณ')}</div>${rows.map(kv).join('')}${I.pdfs.length ? kv(['ไฟล์ PDF', I.pdfs.length + ' ไฟล์']) : ''}</div>
@@ -384,7 +384,7 @@ export function sheet(S, kind, id) {
   const h = frame;
   if (kind === 'impjob') {
     const cur = impTarget(S);
-    return h('เลือกงาน', `<div class="grp" role="radiogroup" aria-label="งาน">${S.jobs.map(x => `<button class="row" role="radio" aria-checked="${cur === x}" data-impjob="${esc(x.id)}"><span class="rt"><span>${esc(x.title)}</span><span class="sub">${x.dates ? dRange(x.dates) : ''}</span></span>${ic('ok', 'ck')}</button>`).join('')}</div>`);
+    return h('เลือกงาน', `<div class="grp" role="radiogroup" aria-label="งาน">${S.jobs.map(x => `<button class="row" role="radio" aria-checked="${cur === x}" data-impjob="${esc(x.id)}"><span class="rt"><span>${esc(F.fmtTitle(x.title))}</span><span class="sub">${x.dates ? dRange(x.dates) : ''}</span></span>${ic('ok', 'ck')}</button>`).join('')}</div>`);
   }
   if (kind === 'val') { const [sc, key] = id.split(/:(.+)/); return valSheet(S, sc, key); }
   if (kind === 'stages') {
@@ -393,7 +393,7 @@ export function sheet(S, kind, id) {
   }
   if (kind === 'example') {
     const j = S.job, cur = exampleOf(S, j), mineA = S.docs.filter(d => isMine(S, d) && d.status === 'accepted'), ex = examples(S);
-    const list = L => `<div class="grp" role="radiogroup" aria-label="ตัวอย่าง">${L.map(d => `<button class="row" role="radio" aria-checked="${cur && cur.id === d.id}" data-ex="${esc(d.id)}"><span class="rt"><span>${esc(d.title)}</span><span class="sub">${d.dates ? dRange(d.dates) + ' · ' : ''}${d.pages} หน้า</span></span>${ic('ok', 'ck')}</button>`).join('')}</div>`;
+    const list = L => `<div class="grp" role="radiogroup" aria-label="ตัวอย่าง">${L.map(d => `<button class="row" role="radio" aria-checked="${cur && cur.id === d.id}" data-ex="${esc(d.id)}"><span class="rt"><span>${esc(F.fmtTitle(d.title))}</span><span class="sub">${d.dates ? dRange(d.dates) + ' · ' : ''}${d.pages} หน้า</span></span>${ic('ok', 'ck')}</button>`).join('')}</div>`;
     return h('เลือกตัวอย่างรายงาน', `${mineA.length ? `<div class="sh">ย้อนหลังของฉัน (ผู้ตรวจรับแล้ว)</div>${list(mineA)}` : ''}<div class="sh">ตัวอย่างรายงานของกอง</div>${list(ex)}`);
   }
   if (kind === 'file') {
@@ -421,7 +421,7 @@ export function sheet(S, kind, id) {
   if (kind === 'wi') return h('WI-CE.SE-002 Rev.06 · ภาคผนวก ข', wiText.replace('<div class="p16"><div class="cap">ขั้นตอน', '<div class="p16"><div class="cap">ภาคผนวก ข · ขั้นตอน'));
   if (kind === 'info') {
     const d = S.docs.find(x => x.id === id), o = isOff(S, id), s = S.catalog.systems.find(x => x.id === d.system);
-    return h('ข้อมูลรายงาน', `<div class="p16"><b>${esc(d.title)}.pdf</b><div class="chips"><span>CE.SE</span>›<span>รายงาน PM</span>›<span>${esc(s.name)}</span>›<span>${d.year}</span>›<span>${d.round.replace('/', '-')}</span></div></div>
+    return h('ข้อมูลรายงาน', `<div class="p16"><b>${esc(F.fmtTitle(d.title))}.pdf</b><div class="chips"><span>CE.SE</span>›<span>รายงาน PM</span>›<span>${esc(s.name)}</span>›<span>${d.year}</span>›<span>${d.round.replace('/', '-')}</span></div></div>
  <div class="grp"><div class="kv"><span>แก้ไขล่าสุด</span><span>${dFull(d.modified)} โดย ${esc(d.by)}</span></div><div class="kv"><span>ขนาด</span><span>${(d.size / 1e6).toFixed(1)} MB</span></div><div class="kv"><span>เก็บไว้ดู offline (ตัวอย่าง)</span>${sw(o, `data-off="${d.id}" aria-label="เก็บไว้ดู offline"`)}</div></div>
  <div class="pad2"><button class="btn" data-toast="โหมดตัวอย่าง · ยังไม่เชื่อมเซิร์ฟเวอร์กอง">${ic('ext')}เปิดไฟล์ต้นฉบับ</button></div>
  <div class="pad2"><details class="rel"><summary>${ic('doc')}เอกสารที่เกี่ยวข้อง</summary><div class="kv"><span>หนังสือคำสั่งปฏิบัติงาน PM</span><span>PDF</span></div><div class="kv"><span>WI-CE.SE-002 Rev.06</span><span>WI</span></div></details></div>`);
