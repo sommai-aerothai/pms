@@ -100,7 +100,7 @@ export function readCell(G, H, rect, floorT, inset = 0.45) {
 
 // toks + รูปแบบของช่อง → ค่า (null ถ้าไม่มั่นใจ/นอกช่วง)
 export function assemble(toks, f) {
-  const { int, dec, signed, neg: alwaysNeg } = f.fmt;
+  const { int, dec, signed, neg: alwaysNeg } = f.fmt, intMax = Math.max(int, String(Math.floor(Math.max(Math.abs(f.range[0]), Math.abs(f.range[1])))).length);   // หลักจำนวนเต็มสูงสุดตามช่วงค่า (เช่น Mod 100%)
   let neg = !!alwaysNeg, conf = 'high', note = '', digs = [], dot = -1;
   toks.forEach((t, i) => {
     if (t.t === '-' && digs.length === 0) { neg = true; return; }
@@ -110,10 +110,10 @@ export function assemble(toks, f) {
   if (alwaysNeg && !toks.some(t => t.t === '-')) { if (rank[conf] > 1) conf = 'medium'; }
   const raw = (neg ? '−' : '') + digs.slice(0, dot < 0 ? digs.length : dot).join('') + (dot >= 0 ? '.' + digs.slice(dot).join('') : '');
   const fail = why => ({ value: null, confidence: 'low', raw, note: why });
-  if (!digs.length || digs.length > int + dec) return fail('จำนวนหลักไม่ตรง');
+  if (!digs.length || digs.length > intMax + dec) return fail('จำนวนหลักไม่ตรง');
   if (dot < 0 && dec > 0) { if (digs.length !== int + dec) return fail('ไม่เห็นจุดทศนิยม'); dot = int; if (rank[conf] > 1) conf = 'medium'; }
   else if (dot < 0) dot = digs.length;
-  if (dot > int || digs.length - dot > dec || dot === 0) return fail('ตำแหน่งจุดไม่ตรง');
+  if (dot > intMax || digs.length - dot > dec || dot === 0) return fail('ตำแหน่งจุดไม่ตรง');
   let v = parseFloat(digs.slice(0, dot).join('') + '.' + (digs.slice(dot).join('') || '0')); if (neg && !f.fmt.abs) v = -v;
   const lo = f.range[0], hi = f.range[1], vv = f.fmt.abs ? Math.abs(v) : v;
   if (vv < lo || vv > hi) return { value: null, confidence: 'low', raw, note: `นอกช่วง ${lo}…${hi}` };
