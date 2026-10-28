@@ -20,6 +20,7 @@ export function validate(m) {
   for (const k of ['printedAtISO', 'docDateISO']) { const v = d[k] ?? ''; if (typeof v !== 'string' || (v && !ISO.test(v))) return null; out[k] = v; }
   if (!/^https?:\/\//.test(out.url) || !out.regNo.trim()) return null;
   if (!Array.isArray(d.entries) || !Array.isArray(d.pdfLinks ?? [])) return null;
+  out.trimmed = d.trimmed === true;   // คำสั่งลัดตัดข้อความยาวออกเพราะลิงก์ยาวเกิน
   out.entries = [];
   for (const e of d.entries.slice(0, MAX_ENTRIES)) {
     if (!plain(e)) return null;

@@ -81,6 +81,33 @@ eq(imp.decodeFragment('#/import?d=' + enc({ ...d, schema: 9 })), null, 'fragment
 eq(imp.decodeFragment('#/import?d=@@@'), null, 'fragment ไม่ใช่ base64url → null');
 eq(imp.decodeFragment('#/import?x=1'), null, 'ไม่มี d= → null');
 
+// ---- โหมดคำสั่งลัด (Apple Shortcuts): สคริปต์เดียวกัน เรียก completion(ลิงก์) → ลิงก์ต้องผ่านตัวตรวจของหน้านำเข้า ----
+const runShortcut = (win, code) => new Promise(res => { win.completion = res; delete win.__pmsTest; const s2 = win.document.createElement('script'); s2.textContent = code; win.document.head.append(s2); });
+const url = await runShortcut(fx.contentWindow, src);
+ok(/^https:\/\/sommai-aerothai\.github\.io\/pms\/#\/import\?d=[A-Za-z0-9_-]+$/.test(url), 'คำสั่งลัด: completion ได้ลิงก์ APP#/import?d=…');
+const sv = imp.decodeFragment(url.slice(url.indexOf('#')));
+ok(sv && sv.data.regNo === '595' && sv.data.entries.length === 3 && sv.data.entries[2].note === 'รับทราบครับ' && !sv.data.trimmed, 'คำสั่งลัด: ลิงก์ที่ได้ผ่าน decodeFragment ข้อมูลครบ ไม่ถูกตัด');
+ok(url.length < 8000, 'คำสั่งลัด: ลิงก์ < 8000 ตัวอักษร');
+fx.contentWindow.__pmsTest = {}; const sc3 = fx.contentDocument.createElement('script'); sc3.textContent = src; fx.contentDocument.head.append(sc3);
+const L = fx.contentWindow.__pmsTest.link;
+// ลิงก์ยาวเกิน: ตัดข้อความบันทึกงาน เก็บช่องหลัก + trimmed
+const huge = { ...structuredClone(d), entries: Array.from({ length: 30 }, (_, i) => ({ ...structuredClone(d.entries[0]), note: 'ข้อความยาว'.repeat(300) + i })) };
+const hl = L(huge, 8000), hv = imp.decodeFragment(hl.slice(hl.indexOf('#')));
+ok(hv && hv.data.trimmed === true && hv.data.regNo === '595' && hv.data.subject === d.subject && hv.data.entries.length > 0 && hv.data.entries.every(e => e.note === ''), 'ลิงก์เกิน 8 KB: ตัดข้อความบันทึกงาน เก็บช่องหลัก + trimmed=true');
+ok(hl.length - hl.indexOf('d=') - 2 <= 8000, 'ลิงก์หลังตัดไม่เกินเพดาน');
+eq(imp.decodeFragment(L(d, Infinity).slice(L(d, Infinity).indexOf('#'))).data.trimmed, false, 'ไม่เกินเพดาน = ไม่ตัด');
+// ลิงก์ที่เป็นอันตราย (ผู้ใช้ถูกหลอกให้เปิด): ถูกปฏิเสธ
+for (const [name, o] of [['ช่องยาวเกิน 2000 ถูกตัด ไม่ล้น', null], ['url javascript:', { url: 'javascript:alert(1)' }], ['ช่องผิดชนิด', { subject: { x: 1 } }], ['entries 100 รายการ ถูกตัดที่ 50', null]]) {
+  if (name.startsWith('ช่องยาว')) { const r = imp.decodeFragment('#/import?d=' + enc({ ...d, subject: 'ก'.repeat(20000) })); ok(r && r.data.subject.length === 2000, 'ลิงก์: ' + name); }
+  else if (name.startsWith('entries')) { const r = imp.decodeFragment('#/import?d=' + enc({ ...d, entries: Array.from({ length: 100 }, () => d.entries[0]) })); ok(r && r.data.entries.length === 50, 'ลิงก์: ' + name); }
+  else eq(imp.decodeFragment('#/import?d=' + enc({ ...d, ...o })), null, 'ลิงก์: ปฏิเสธ ' + name);
+}
+eq(imp.decodeFragment('#/import?d=' + 'A'.repeat(200001)), null, 'ลิงก์ใหญ่เกิน 200000 → ปฏิเสธ');
+ok(imp.decodeFragment('#/import?d=' + enc({ ...d, trimmed: 'yes', evil: '<script>' })).data.trimmed === false, 'trimmed ไม่ใช่ boolean true = false · ช่องแปลกถูกทิ้ง');
+// หน้าที่ไม่ใช่สารบรรณ: ลิงก์ที่แอปแจ้งว่าไม่ถูกต้อง
+{ const w2 = (() => { const f2 = document.createElement('iframe'); document.body.append(f2); return f2; })(); w2.contentDocument.body.textContent = 'หน้าอื่น';
+  const u2 = await runShortcut(w2.contentWindow, src); eq(imp.decodeFragment(u2.slice(u2.indexOf('#'))), null, 'หน้าที่ไม่ใช่สารบรรณ: ลิงก์ไม่ผ่านตัวตรวจ (แอปแจ้งข้อผิดพลาด)'); ok(u2.includes('#/import?e=1'), 'หน้าอื่น: ลิงก์ #/import?e=1'); }
+
 // ---- จับคู่งาน ----
 const systems = [{ id: 'tx-stby', name: 'DM TX Radio STBY' }, { id: 'tx-main', name: 'DM TX Radio Main' }, { id: 'vccs', name: 'DM VCCS' }, { id: 'vccs-bk', name: 'DM VCCS Backup' }];
 const jobs = [{ id: 'a', system: 'tx-stby', round: '2/69' }, { id: 'b', system: 'tx-stby', round: '1/70' }, { id: 'c', system: 'tx-main', round: '2/69' }, { id: 'e', system: 'vccs', round: '1/70' }, { id: 'f', system: 'vccs-bk', round: '1/70' }];
