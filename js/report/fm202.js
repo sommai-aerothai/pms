@@ -21,7 +21,7 @@ export function map202(job) {
     pages = Math.max(pages, p + 1);
     // รหัสเครื่องเป็นข้อความเสมอ (กันเลข 0 นำหน้าหาย) · Asset = ค่าที่ตรวจจากสติกเกอร์เท่านั้น ไม่ใช้ทะเบียนแทน
     put(p, 'B' + r, val(t.freq)); put(p, 'E' + r, str(t.model)); put(p, 'G' + r, str(v.asset)); put(p, 'H' + r, str(v.serial));
-    const empty = str(v.asset) ? [] : ['Asset No (ยังไม่ตรวจสติกเกอร์)'];
+    const empty = [['Freq', t.freq], ['Model', t.model], ['Asset No (ยังไม่ตรวจสติกเกอร์)', v.asset], ['Serial', v.serial]].filter(([, x]) => !str(x)).map(([k]) => k);
     for (const f of FM202_FIELDS) {
       let x = val(v[f.k]);
       if (f.k === 'spur' && typeof x === 'number') x = Math.abs(x);   // แอปเก็บ −66 dBc · ฟอร์มที่ผู้ตรวจรับแล้วเขียนขนาด 66
