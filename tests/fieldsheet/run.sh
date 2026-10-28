@@ -18,6 +18,7 @@ fi
 CP=$!; for i in $(seq 1 240); do grep -q FS-DONE "$LOG" && break; sleep 1; done; kill $CP 2>/dev/null
 OUT=$(sed -n '/FS-DONE/,$p' "$LOG" | sed 's/", source:.*//;s/^\[.*INFO:CONSOLE[^"]*"//' | sed '/^$/d' | grep -v '^\[')
 echo "$OUT" | head -${LINES_MAX:-40}
+echo "$OUT" | grep -q FS-DONE || { echo "ทดสอบไม่จบ (ไม่พบ FS-DONE)"; exit 1; }
 # exit code จริง: ชุด fieldsheet ต้องมี PASS · ชุด official รายงานตัวเลขอย่างเดียว (ต้องไม่มี ERROR)
 if [ "$PAGE" = official ]; then echo "$OUT" | grep -q ERROR && exit 1; exit 0; fi
 echo "$OUT" | grep -qx PASS

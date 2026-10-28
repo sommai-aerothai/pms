@@ -14,7 +14,7 @@ self.addEventListener('fetch', e => {
   const r = e.request, u = new URL(r.url);
   if (r.method !== 'GET' || u.origin !== location.origin) return;
   if (/\/vendor\//.test(u.pathname)) {
-    e.respondWith(caches.open(VENDOR).then(c => c.match(r).then(hit => hit || fetch(r).then(res => { if (res.ok) c.put(r, res.clone()); return res; }))));
+    e.respondWith(caches.open(VENDOR).then(c => c.match(r).then(hit => hit || caches.match(r)).then(hit => hit || fetch(r).then(res => { if (res.ok) c.put(r, res.clone()); return res; }))));   // caches.match = ไฟล์ vendor ที่ precache ไว้ใน VERSION (jsQR) ใช้ได้ offline ตั้งแต่ติดตั้ง
   } else if (/\/(api|data)\//.test(u.pathname)) {
     e.respondWith(fetch(r).then(res => {
       if (res.ok) { const cp = res.clone(); e.waitUntil(caches.open(VERSION).then(c => c.put(r, cp))); }   // เก็บเฉพาะคำตอบ ok
