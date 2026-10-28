@@ -21,7 +21,7 @@ const pick = (...v) => { const x = v.slice(0, -1).find(y => y !== undefined && y
 // id (string ไม่ซ้ำในหมวดเอกสาร) · code ('' ได้) · rev · title · name (= title) · tag · kind · cat (id หมวด) · sourceUrl (http(s) หรือ '')
 // storagePath (path ใน bucket 'docs' หรือ null = ยังไม่มีไฟล์ในระบบ) · bucket ('docs') · pages (null = ไม่รู้ ห้ามเดา) · size · sha256 · fetchedAt (ISO หรือ null) · offline (ค่าเริ่ม ตั้งเก็บ offline)
 // ชื่อเอกสาร: ฐานจริงเก็บ title = รหัส (บางแถวต่อท้ายหมายเหตุ "(ไฟล์แก้ได้…)") → ถ้า title ไม่มีชื่อ ดึงจากชื่อไฟล์ (ตัดนามสกุล · รหัสนำหน้า เช่น ExFM-CESE-001 / SD-CE.SE-86 / WI-CESE-02 · Rev.xx) · Rev อ่านจาก title/ไฟล์เมื่อฐานไม่มี
-const REV_RE = /[\s_(\-]*Rev\.?\s*(\d+)\)?/i, CODE_PFX = /^(?:Ex)?(?:FM|WI|QP|QM|SD)[-_. ]*(?:CE\.?SE)?[-_. ]*\d+[A-Za-z]?/i;
+const REV_RE = /[\s_(\-]*Rev\.?\s*(\d+)\)?/i, CODE_PFX = /^(?:Ex)?(?:FM|WI|QP|QM|SD)[-_. ]*(?:CE\.?SE)?[-_. ]*\d+/i;
 const tidy = t => t.replace(/[_\s]+/g, ' ').replace(/^[\s\-–.:()]+|[\s\-–.:(]+$/g, '').trim();
 const extOf = f => (/\.([A-Za-z0-9]+)$/.exec(f || '') || [])[1]?.toLowerCase() || '';
 const nameOf = (title, code, file) => {
@@ -44,7 +44,7 @@ export const mergeFormats = rows => {
     const k = d.code && d.title ? `${d.code}|${d.title}`.toLowerCase() : '', g = k && by.get(k);
     if (!g) { const x = { ...d }; out.push(x); if (k) by.set(k, x); continue; }
     const [pdf, other] = isPdf(g) && !isPdf(d) ? [g, d] : !isPdf(g) && isPdf(d) && !g.editable ? [d, g] : [null, null];
-    if (!pdf || pdf.editable) { out.push({ ...d }); continue; }
+    if (!pdf || pdf.editable || !other.storagePath || (g.rev && d.rev && g.rev !== d.rev)) { out.push({ ...d }); continue; }   // ไม่รวมถ้าไฟล์แก้ได้ไม่มีในระบบ (เหลือแต่ลิงก์เว็บ) หรือคนละ Rev
     const ed = { id: other.id, file: other.file, storagePath: other.storagePath, bucket: other.bucket, size: other.size, sourceUrl: other.sourceUrl };
     if (pdf === g) g.editable = ed; else { Object.assign(out[out.indexOf(g)], { ...d, editable: ed }); }
   }
