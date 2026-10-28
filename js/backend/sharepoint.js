@@ -11,4 +11,3 @@ export const getBlob = nope;
 // TODO Graph: List PMJobs (ขั้น 2)
 export const getJob = nope;
 export const getCatalog = nope;
-export const getRecent = nope;

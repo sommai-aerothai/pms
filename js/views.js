@@ -41,10 +41,11 @@ const expired = j => j.tools.filter(t => Date.parse(t.due) < Date.now());
 const sysName = (S, id) => (S.catalog.systems.find(s => s.id === id) || {}).name || id;
 
 // ---------- วันนี้ ----------
+const bkk = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());   // YYYY-MM-DD ตามเวลาไทย
 const DAYS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
 const act = (href, label, pre = '') => `<a class="btn" href="${href}"${pre ? ` data-pre="${pre}"` : ''}>${label}</a>`;
 export function today(S) {
-  const j = S.job, n = j.tx.length, k = txDoneCount(j), ft = j.tx.find(t => !txDone(j, t)), now = new Date(), loc = (S.catalog.systems.find(x => x.id === j.system) || {}).loc || '';
+  const j = S.job, n = j.tx.length, k = txDoneCount(j), ft = j.tx.find(t => !txDone(j, t)), loc = (S.catalog.systems.find(x => x.id === j.system) || {}).loc || '';
   const doing = S.started
     ? `<div class="p16"><div class="big">${esc(j.title)}</div><div class="sec">${esc(loc)} · ${dRange(j.dates)}</div>
    <div class="mt3"><b>${ft ? `เครื่องส่ง ${k}/${n}` : `ฟอร์ม ${formsDone(j)}/${j.forms.length}`}</b></div><div class="bar2"><i style="width:${100 * k / n}%"></i></div>${st('todo', 'กำลังทำ')}
@@ -53,12 +54,12 @@ export function today(S) {
   const blk = [...(S.started ? expired(j).map(t => [st('warn', `เครื่องมือหมดอายุ · ${t.name}`), '#/pm/tools', '']) : []),
     ...S.templates.filter(t => t.isNew).map(t => [st('todo', `ฟอร์ม ${t.code} Rev.${t.rev} ใหม่ ยังไม่โหลด`), '#/docs', 'd:d-fm'])];
   const chk = blk.length ? `${blk.map(x => `<div class="srow">${x[0]}</div>`).join('')}<div class="p16">${act(blk[0][1], 'ตรวจรายการ', blk[0][2])}</div>` : `<div class="srow">${st('ok', 'พร้อมทำงาน')}</div>`;
-  const prev = S.docs.find(d => d.id === 'tx-stby-2569-2-69');
+  const nt = ft && (j.tx.find(t => !txDone(j, t) && t.n !== ft.n) || ft), prev = S.docs.find(d => d.id === 'tx-stby-2569-2-69');
   const nxt = S.started
-    ? `<div class="p16"><div class="big">ตรวจเลขทรัพย์สิน</div><div class="sec">${ft ? 'หลังกรอกค่าเครื่องส่งครบ' : 'ค่าเครื่องส่งครบแล้ว'}</div><div class="mt3">${act('#/pm/asset', 'ไปขั้นถัดไป')}</div></div>`
+    ? `<div class="p16">${ft ? `<div class="big">กรอกค่าเครื่องส่ง ${nt.n}</div><div class="sec">แล้วจึงตรวจเลขทรัพย์สิน · หลังกรอกครบ</div><div class="mt3">${act('#/pm/fill', 'ไปขั้นถัดไป', 'cur:' + nt.n)}</div>` : `<div class="big">ตรวจเลขทรัพย์สิน</div><div class="sec">ค่าเครื่องส่งครบแล้ว</div><div class="mt3">${act('#/pm/asset', 'ไปขั้นถัดไป')}</div>`}</div>`
     : `<div class="p16"><div class="big">เปิดรายงานรอบก่อน</div><div class="sec">${esc(prev.title)} · ดูตัวอย่างก่อนเริ่มงาน</div><div class="mt3">${act('#/today/doc/' + prev.id, 'ไปขั้นถัดไป')}</div></div>`;
   return `${nav('วันนี้')}<div class="in today"><div class="th"><h1 class="lt">วันนี้</h1><a class="avb" href="#/me" aria-label="ฉัน"><span>${esc([...S.user.name][0])}</span></a></div>
- <p class="sec note">สวัสดี ${esc(S.user.name)} · ${DAYS[now.getDay()]} ${dShort(now.toISOString())}</p>
+ <p class="sec note">สวัสดี ${esc(S.user.name)} · ${DAYS[new Date(bkk() + 'T00:00:00Z').getUTCDay()]} ${dShort(bkk())}</p>
  <div class="sh">กำลังทำ</div><div class="grp">${doing}</div>
  <div class="sh">ต้องตรวจ</div><div class="grp">${chk}</div>
  <div class="sh">ต่อไป</div><div class="grp">${nxt}</div></div>`;

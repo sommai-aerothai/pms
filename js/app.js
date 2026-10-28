@@ -9,14 +9,14 @@ const VERSION = 'v0.2';
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const app = $('#app'), TABS = ['today', 'pm', 'docs'];
 const TITLES = { today: 'วันนี้', docs: 'เอกสาร', pm: 'งาน PM', me: 'ฉัน' };
-const S = { ph: {}, rev: 0, ui: {}, version: VERSION, user: null, docs: [], templates: [], catalog: null, job: null, recent: [], started: false };
+const S = { ph: {}, rev: 0, ui: {}, version: VERSION, user: null, docs: [], templates: [], catalog: null, job: null, started: false };
 const pad = matchMedia(`(min-width:${tok('bp-pad')}px)`);
 let chain = [], tab = 'today', lastTab = null, lastHash = {}, saveT, toastT, tapFn = null;
 
 // ---------- โหลดข้อมูล ----------
 async function load() {
-  [S.docs, S.templates, S.catalog, S.recent] = [(await store.listDocs()).items, await store.listTemplates(), await store.getCatalog(), await store.getRecent()];
-  S.job = S.job || await store.getJob('dm-txs-3-69'); S.started = !!store.pref('started');
+  [S.docs, S.templates, S.catalog] = [(await store.listDocs()).items, await store.listTemplates(), await store.getCatalog()];
+  S.job = S.job || await store.getJob('dm-txs-3-69'); S.started = !!store.pref('started') || store.hasJob(S.job.id);   // งานที่บันทึกไว้จากเวอร์ชันก่อน = เริ่มแล้ว
   await loadPhotos();
 }
 const photoIds = () => { const j = S.job; return [...j.tx.flatMap(t => Object.values(t.photos)), ...j.tools.map(t => t.photo), ...j.folder.photos.map(p => p.id)].filter(Boolean); };
@@ -68,7 +68,12 @@ function draw() {
   $('.tabbar').classList.remove('mini');
   if (changed) { app.offsetWidth; app.classList.remove('nq'); }
   lastTab = tab; lastHash[tab] = location.hash.split('/doc/')[0];
-  const d = r.chain[n] && r.chain[n].id === 's-view' && r.chain[n].arg; if (d && S.docs.find(x => x.id === d) && (!S.recent[0] || S.recent[0][0] !== d)) store.touchRecent(d).then(async () => { S.recent = await store.getRecent(); S.rev++; draw(); });
+}
+// ลิงก์เก่า #/home → #/today · #/man → #/docs (ฟอร์ม/WI) เก็บ path ย่อยไว้
+function migrate() {
+  const m = location.hash.match(/^#\/(home|man)(\/.*)?$/); if (!m) return;
+  if (m[1] === 'man') S.ui.d = 'd-fm';
+  history.replaceState(null, '', (m[1] === 'home' ? '#/today' : '#/docs') + (m[2] || ''));
 }
 const go = h => { location.hash = h; };
 function pop() {
@@ -235,6 +240,7 @@ $('#codeBoxes').addEventListener('input', e => {
   if (b.every(x => x.value)) finishLogin();
 });
 $('#codeBoxes').addEventListener('keydown', e => { const b = boxes(), n = b.indexOf(e.target); if (e.key === 'Backspace' && !e.target.value && b[n - 1]) b[n - 1].focus(); });
+$('#codeBoxes').addEventListener('paste', e => { e.preventDefault(); const d = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6), b = boxes(); d.split('').forEach((c, k) => { b[k].value = c; }); if (d) b[Math.min(5, d.length)].focus(); if (b.every(x => x.value)) finishLogin(); });
 $('#emailForm').addEventListener('submit', e => { e.preventDefault(); sendCode(); });
 
 // ---------- เริ่มทำงาน ----------
@@ -242,11 +248,11 @@ function themeColor() { $('meta[name=theme-color]').content = getComputedStyle(d
 matchMedia('(prefers-color-scheme:dark)').addEventListener('change', themeColor); themeColor();
 const setPad = () => { document.body.classList.toggle('pad', pad.matches); if (S.job) draw(); };
 pad.addEventListener('change', setPad); document.body.classList.toggle('pad', pad.matches);
-addEventListener('hashchange', () => { closeSheet(); draw(); });
+addEventListener('hashchange', () => { migrate(); closeSheet(); draw(); });
 initGestures({ app, depth: () => chain.length - 1, top: () => $('#' + chain[chain.length - 1].id), parent: () => $('#' + chain[chain.length - 2].id), pop, closeSheet, setM, cur: () => S.job.cur, refresh, isPad: () => pad.matches });
 (async () => {
   const u = store.pref('user'); S.user = u || { name: 'สมหมาย' }; app.classList.toggle('login', !u);
-  await load(); draw();
+  await load(); migrate(); draw();
 })();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   const ready = w => toast('มีเวอร์ชันใหม่ แตะเพื่อโหลด', 'sync', () => w.postMessage('skip'), 0);

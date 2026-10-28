@@ -31,7 +31,6 @@ const docs = [
   D('tx-stby', 2568, '2/68', 'PM DM TX Radio STBY ครั้งที่ 2/68', '2025-08-08T03:00:00Z', 19, 2, 'accepted', { dates: ['2025-08-05', '2025-08-07'] }),
   D('tx-bk1', 2569, '1/69', 'PM DM TX Radio Backup 1 ครั้งที่ 1/69', '2026-10-08T03:00:00Z', 14, 2, 'accepted', { dates: ['2026-10-06', '2026-10-07'] }),
 ];
-export const recent = [['tx-stby-2569-2-69', '2026-10-27T05:00:00Z'], ['tx-stby-2569-1-69', '2026-10-24T05:00:00Z'], ['tx-bk1-2569-1-69', '2026-10-20T05:00:00Z']];
 
 const T = (code, rev, name, pages, size, extra = {}) => ({ schema: 1, code, rev, name, pages, size, fetchedAt: '2026-10-28T02:00:00Z',
   sourceUrl: `https://home.aerothai.co.th/cese/node/${extra.kind === 'wi' ? 524 : 526}`, sha256: '0'.repeat(64), kind: 'form', ...extra });
@@ -83,4 +82,3 @@ export const listTemplates = async () => templates;
 export const getBlob = async () => new Blob([]);
 export const getJob = async () => seedJob();
 export const getCatalog = async () => catalog;
-export const getRecent = async () => recent;
