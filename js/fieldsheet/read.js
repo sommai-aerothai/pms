@@ -87,14 +87,14 @@ export function readCells(G, H, L, page, { white, black }) {
       for (const t of toks) {
         if (t.t === '.') { str += '.'; raw += '.'; seenDot = true; continue; }
         if (t.t !== 'b') continue;
-        if (t.empty) { if (!seenDigit && !seenDot) { str += '0'; raw += '0'; if (rank[conf] > 1) conf = 'medium'; }   // ช่องหน้าว่าง = 0 แต่ไม่ให้ high (อาจเป็นลายจางที่มองไม่เห็น) else { bad = true; raw += '?'; } continue; }
+        if (t.empty) { if (!seenDigit && !seenDot) { str += '0'; raw += '0'; if (rank[conf] > 1) conf = 'medium'; } else { bad = true; raw += '?'; } continue; }   // ช่องหน้าว่าง = 0 แต่ไม่ให้ high (อาจเป็นลายจางที่มองไม่เห็น)
         seenDigit = true; str += t.digit; raw += t.digit;
         const c = confOf(t.p); if (rank[c] < rank[conf]) conf = c;
       }
       if (sp && sm) { if (sp.on && sm.on) { bad = true; raw = '±' + raw; } else if (sm.on) neg = true; else if (!sp.on && parseFloat(str) !== 0 && conf === 'high') conf = 'medium'; }
       if (neg && !sm) raw = '−' + raw;
       const low = bad || conf === 'low';
-      out.push({ field: `tx[${no}].${f.id}`, value: low ? null : (neg ? -1 : 1) * parseFloat(str), unit: f.unit, locator: `fieldsheet p${page} r${r + 1} c${fi + 1}`, confidence: low ? 'low' : conf, raw });
+      out.push({ field: `tx[${no}].${f.id}`, value: low ? null : f.abs ? Math.abs(parseFloat(str)) : (neg ? -1 : 1) * parseFloat(str), unit: f.unit, locator: `fieldsheet p${page} r${r + 1} c${fi + 1}`, confidence: low ? 'low' : conf, raw });
     });
   }
   return out;
@@ -103,11 +103,12 @@ export function readCells(G, H, L, page, { white, black }) {
 export async function readFieldSheet(src, opts = {}) {
   const t0 = performance.now(), id = await toImageData(src, opts.max || 2400), jsQR = await loadJsQR();
   let code = jsQR(id.data, id.width, id.height, { inversionAttempts: 'dontInvert' });
-  if (!code) {   // รูปมี noise: ย่อครึ่ง (เฉลี่ย 2×2) แล้วลองใหม่ แล้วคูณพิกัดกลับ
-    const w = id.width >> 1, h = id.height >> 1, d = new Uint8ClampedArray(w * h * 4), S = id.data;
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) for (let c = 0; c < 4; c++) { const i = (2 * y * id.width + 2 * x) * 4 + c; d[(y * w + x) * 4 + c] = (S[i] + S[i + 4] + S[i + id.width * 4] + S[i + id.width * 4 + 4]) >> 2; }
+  for (const f of [2, 3, 4]) {   // รูปมี noise: ย่อ (เฉลี่ย f×f) แล้วลองใหม่ แล้วคูณพิกัดกลับ
+    if (code) break;
+    const w = Math.floor(id.width / f), h = Math.floor(id.height / f), d = new Uint8ClampedArray(w * h * 4), S = id.data, W = id.width;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) for (let c = 0; c < 4; c++) { let t = 0; for (let j = 0; j < f; j++) for (let i = 0; i < f; i++) t += S[((f * y + j) * W + f * x + i) * 4 + c]; d[(y * w + x) * 4 + c] = t / (f * f); }
     const c2 = jsQR(d, w, h, { inversionAttempts: 'dontInvert' });
-    if (c2) { const l = c2.location; for (const k in l) if (l[k]?.x != null) { l[k] = { x: l[k].x * 2 + 0.5, y: l[k].y * 2 + 0.5 }; } code = c2; }
+    if (c2) { const l = c2.location; for (const k in l) if (l[k]?.x != null) l[k] = { x: l[k].x * f + f / 2, y: l[k].y * f + f / 2 }; code = c2; }
   }
   if (!code) return null;
   let meta; try { meta = JSON.parse(code.data); } catch { return null; }

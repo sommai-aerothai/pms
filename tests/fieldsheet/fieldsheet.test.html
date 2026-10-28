@@ -13,7 +13,7 @@ const out = [], log = s => { out.push(s); document.getElementById('out').textCon
 const q = new URLSearchParams(location.search), usePdf = q.has('pdf'), SEEDS = +q.get('seeds') || 3;
 const L = await loadLayout('fm202-v1'), sprite = await loadSprite(), job = 'JOB-2569-02';
 const txs = Array.from({ length: 21 }, (_, i) => ({ no: i + 1, freq: 118 + i * 1.325 }));
-let dOK = 0, dN = 0, fOK = 0, fN = 0, fNull = 0, fWrong = 0, metaBad = 0, readFail = 0; const times = [];
+let spurNeg = 0, dOK = 0, dN = 0, fOK = 0, fN = 0, fNull = 0, fWrong = 0, metaBad = 0, readFail = 0; const times = [];
 for (let seed = 1; seed <= SEEDS; seed++) for (const page of [1, 2]) {
   const R = rng(seed * 100 + page), K = 7;
   let base;
@@ -37,14 +37,14 @@ for (let seed = 1; seed <= SEEDS; seed++) for (const page of [1, 2]) {
   if (!res.ok) { readFail++; log(`p${page}/s${seed}: ${res.note} ${JSON.stringify(res.dbg)}`); continue; }
   times.push(res.ms);
   if (res.meta.j !== job || res.meta.f !== 'FM-202' || res.meta.p !== page || res.meta.l !== 'fm202-v1') metaBad++;
-  const got = Object.fromEntries(res.values.map(v => [v.field, v]));
+  const got = Object.fromEntries(res.values.map(v => [v.field, v])); spurNeg += res.values.filter(v => /spurious/.test(v.field) && v.value < 0).length;
   for (const [key, t] of Object.entries(truth)) {
     const v = got[key], rd = v ? v.raw.replace(/[^0-9?]/g, '') : '';
     for (let i = 0; i < t.digs.length; i++) { dN++; if (rd[i] === t.digs[i]) dOK++; else if (q.has('v')) log(`  ${key} ${t.digs} ≠ ${v ? v.raw : '-'} (${v?.confidence})`); }
     fN++;
     const f = L.fields.find(f => key.endsWith('.' + f.id)), s = f.parts.replace(/[pm]/g, '').replace('-', '');
     let str = ''; { let j = 0; for (const c of s) str += c === '.' ? '.' : t.digs[j++]; }
-    const want = (t.neg ? -1 : 1) * parseFloat(str);
+    const want = f.abs ? Math.abs(parseFloat(str)) : (t.neg ? -1 : 1) * parseFloat(str);
     if (v && v.value === want) fOK++; else if (v && v.value == null) fNull++; else fWrong++;
   }
 }
@@ -52,6 +52,11 @@ const dAcc = dOK / dN, fAcc = fOK / fN, ms = times.reduce((a, b) => a + b, 0) / 
 log(`ตัวเลขถูก ${dOK}/${dN} = ${(dAcc * 100).toFixed(2)}%`);
 log(`ค่าครบทั้งฟิลด์ถูก ${fOK}/${fN} = ${(fAcc * 100).toFixed(1)}% · null(ถามผู้ใช้) ${fNull} · ผิดแบบมั่นใจ ${fWrong}`);
 log(`metadata ผิด ${metaBad} · อ่านไม่ได้ ${readFail} · เวลา/หน้า เฉลี่ย ${ms.toFixed(0)} ms (สูงสุด ${Math.max(...times, 0).toFixed(0)})`);
-const pass = dAcc >= 0.95 && !metaBad && !readFail;
+// ข้อตกลงเครื่องหมาย: Spurious dBc เป็นขนาดบวก (66 = −66 dBc) เหมือนฟอร์มทางการ/xlsx ทั้งสามทางต้องตรงกัน
+const { XLSX_MAPS } = await import('../../js/readers/forms.js'), { default: off } = await import('../../js/fieldsheet/layouts/fm202-official.json', { with: { type: 'json' } });
+const xs = XLSX_MAPS['FM-CE.SE-202']([{ name: 'Page 1', cells: { A9: 1, O9: 66 } }]).find(v => v.field === 'tx[1].spurious_dbc');
+const conv = xs?.value === 66 && off.fields.find(f => f.id === 'spurious_dbc').fmt.abs && L.fields.find(f => f.id === 'spurious_dbc').abs && spurNeg === 0;
+log(conv ? 'spurious: ทั้ง 3 ทางเป็นค่าบวก OK' : 'spurious: เครื่องหมายไม่ตรงกัน'); 
+const pass = conv && dAcc >= 0.95 && !metaBad && !readFail;
 log(pass ? 'PASS' : 'FAIL'); document.title = pass ? 'PASS' : 'FAIL'; console.log('FS-DONE\n' + out.join('\n'));
 </script>
