@@ -3,7 +3,7 @@
 cd "$(dirname "$0")/../.." || exit 1
 CH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; PORT=${PORT:-18731}; LOG=$(mktemp)
 python3 -m http.server $PORT >/dev/null 2>&1 & SRV=$!; trap 'kill $SRV' EXIT; sleep 1
-URL="http://localhost:$PORT/tests/fieldsheet/fieldsheet.test.html"
+PAGE=${TEST:-fieldsheet}; URL="http://localhost:$PORT/tests/fieldsheet/$PAGE.test.html"
 if [ "$1" = pdf ]; then
   mkdir -p tests/fieldsheet/.tmp
   for p in 1 2; do

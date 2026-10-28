@@ -1,6 +1,7 @@
 <!doctype html><meta charset="utf-8"><title>fieldsheet test</title>
 <pre id="out">running…</pre>
 <script type="module">
+addEventListener("unhandledrejection", e => console.log("FS-DONE\nERROR " + (e.reason && e.reason.stack || e.reason))); addEventListener("error", e => console.log("FS-DONE\nERROR " + e.message));
 // ใบจดค่า FM-202: render → วางลายมือ MNIST → บิดภาพ → อ่าน · ผ่านเมื่อตัวเลขถูก ≥95% และ metadata ถูกทุกใบ
 // ?pdf=1 : ใช้ภาพ .tmp/p-<n>.png ที่ได้จาก print-to-pdf + pdftoppm แทน SVG raster (รัน run.sh)
 import { loadLayout, cells } from '../../js/fieldsheet/layout.js';

@@ -71,6 +71,14 @@ async function image(file, ctx) {
   }
   const { readImage } = await import('./image.js');
   const r = await readImage(file, ctx);
+  if (!r.target) {   // ไม่ใช่ใบจดค่า/สติกเกอร์/จอวัด → ลองฟอร์มทางการที่เขียนมือ (FM-202) · แม่นยำต่ำกว่าใบจดค่า จึงไม่ให้ confidence high
+    const o = await import('../fieldsheet/official.js').then(m => m.readOfficial(file, { ocr: true })).catch(() => null);
+    if (o?.ok && o.values.length) {
+      const n = o.values.filter(v => v.value != null).length;
+      return res('image', { target: { form: o.meta.form, rev: o.meta.rev, page: o.meta.page }, values: o.values, confidence: 'medium', subkind: 'official-handwriting',
+        note: `✍ ${o.meta.form} หน้า ${o.meta.page} (ลายมือบนฟอร์มจริง) · อ่านได้ ${n} ค่า · ${o.values.length - n} ค่าต้องตรวจเอง · ตรวจทุกค่าก่อนใช้` });
+    }
+  }
   return res('image', { target: r.target, values: r.values, text: r.text, confidence: r.confidence, note: r.note, subkind: r.kind });
 }
 

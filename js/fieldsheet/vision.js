@@ -83,3 +83,43 @@ export function norm28(d, contrast, comps, cw) {
   for (let v = 0; v < th; v++) for (let u = 0; u < tw; u++) { const X = u + ox, Y = v + oy; if (X >= 0 && X < 28 && Y >= 0 && Y < 28) out[Y * 28 + X] = t[v * tw + u]; }
   return out;
 }
+
+// ---- ใช้กับฟอร์มทางการ (ไม่มี QR) ----
+// least-squares homography จากหลายจุด (normalise พิกัดก่อน) · คืน h[8]
+export function fitH(src, dst) {
+  const norm = P => { const n = P.length, cx = P.reduce((s, p) => s + p[0], 0) / n, cy = P.reduce((s, p) => s + p[1], 0) / n; const d = P.reduce((s, p) => s + Math.hypot(p[0] - cx, p[1] - cy), 0) / n / Math.SQRT2 || 1; return { T: [1 / d, 0, -cx / d, 0, 1 / d, -cy / d], P: P.map(p => [(p[0] - cx) / d, (p[1] - cy) / d]) }; };
+  const S = norm(src), D = norm(dst), N = Array.from({ length: 8 }, () => new Float64Array(9));
+  for (let i = 0; i < S.P.length; i++) {
+    const [x, y] = S.P[i], [u, v] = D.P[i];
+    for (const r of [[x, y, 1, 0, 0, 0, -u * x, -u * y, u], [0, 0, 0, x, y, 1, -v * x, -v * y, v]]) for (let a = 0; a < 8; a++) for (let b = 0; b < 9; b++) N[a][b] += r[a] * r[b];
+  }
+  for (let c = 0; c < 8; c++) {
+    let p = c; for (let r = c + 1; r < 8; r++) if (Math.abs(N[r][c]) > Math.abs(N[p][c])) p = r;
+    if (Math.abs(N[p][c]) < 1e-12) return null;
+    [N[c], N[p]] = [N[p], N[c]];
+    for (let r = 0; r < 8; r++) if (r !== c) { const f = N[r][c] / N[c][c]; for (let k = c; k < 9; k++) N[r][k] -= f * N[c][k]; }
+  }
+  const h = N.map((r, i) => r[8] / r[i]);   // ในพิกัด normalise: Dn = Hn · Sn → ย้อนกลับด้วย Td⁻¹ · Hn · Ts
+  const m = (A, B) => { const o = []; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { let s = 0; for (let k = 0; k < 3; k++) s += A[i * 3 + k] * B[k * 3 + j]; o.push(s); } return o; };
+  const Hn = [...h, 1], t = D.T, Tinv = [1 / t[0], 0, -t[2] / t[0], 0, 1 / t[4], -t[5] / t[4], 0, 0, 1];
+  const Ts = [...S.T, 0, 0, 1], R = m(Tinv, m(Hn, Ts)); return R.slice(0, 8).map(v => v / R[8]);
+}
+// Hough หาเส้นเกือบนอน (kind 'h') / เกือบตั้ง (kind 'v') · mask Uint8 · คืน [{th,rho,votes}] เรียงตามตำแหน่ง · เส้น: h: −x·sinθ + y·cosθ = ρ ; v: x·cosθ + y·sinθ = ρ
+export function hough(mask, w, h, kind, { maxDeg = 10, step = 0.25, minFrac = 0.35, sep = 6 } = {}) {
+  const nth = Math.round(2 * maxDeg / step) + 1, off = w + h, nr = 2 * off + 1, acc = new Uint16Array(nth * nr);
+  const sn = [], cs = []; for (let t = 0; t < nth; t++) { const th = (-maxDeg + t * step) * Math.PI / 180; sn.push(Math.sin(th)); cs.push(Math.cos(th)); }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (mask[y * w + x]) for (let t = 0; t < nth; t++) {
+    const r = Math.round(kind === 'h' ? -x * sn[t] + y * cs[t] : x * cs[t] + y * sn[t]) + off; acc[t * nr + r]++;
+  }
+  let mx = 0; for (let i = 0; i < acc.length; i++) if (acc[i] > mx) mx = acc[i];
+  const cand = []; for (let t = 0; t < nth; t++) for (let r = 1; r < nr - 1; r++) { const v = acc[t * nr + r]; if (v >= mx * minFrac && v >= acc[t * nr + r - 1] && v >= acc[t * nr + r + 1]) cand.push({ th: (-maxDeg + t * step) * Math.PI / 180, rho: r - off, votes: v }); }
+  cand.sort((a, b) => b.votes - a.votes);
+  const out = []; for (const c of cand) if (!out.some(o => Math.abs(o.rho - c.rho) <= sep)) out.push(c);
+  return out.sort((a, b) => a.rho - b.rho);
+}
+// จุดตัดของเส้น h กับเส้น v
+export function cross(hl, vl) {
+  const a = -Math.sin(hl.th), b = Math.cos(hl.th), c = Math.cos(vl.th), d = Math.sin(vl.th), det = a * d - b * c;
+  return [(hl.rho * d - b * vl.rho) / det, (a * vl.rho - c * hl.rho) / det];
+}
+export const distToLine = (l, kind, x, y) => Math.abs(kind === 'h' ? -x * Math.sin(l.th) + y * Math.cos(l.th) - l.rho : x * Math.cos(l.th) + y * Math.sin(l.th) - l.rho);
