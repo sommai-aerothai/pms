@@ -69,7 +69,7 @@ async function image(file, ctx) {
   if (fs) {
     const n = fs.values.filter(v => v.value != null).length, low = fs.values.length - n, t = { form: CANON[fs.meta.f] || fs.meta.f, page: fs.meta.p, job: fs.meta.j };
     return res('image', { target: t, sheet: { job: fs.meta.j, page: fs.meta.p, layout: fs.meta.l }, values: fs.values, confidence: !fs.ok ? 'low' : low ? 'medium' : 'high', subkind: 'fieldsheet',
-      note: fs.ok ? `✍ ใบจดค่าหน้างาน ${t.form} หน้า ${t.page} · อ่านได้ ${n} ค่า${low ? ` · ${low} ค่าต้องตรวจเอง` : ''}` : '✍ ใบจดค่าหน้างาน · ' + fs.note });
+      note: fs.ok ? `✍ ใบจดค่าหน้างาน ${t.form} หน้า ${t.page} · อ่านได้ ${n} ค่า${low ? ` · ${low} ค่าต้องตรวจเอง` : ''}` : '⚠ ใบจดค่าหน้างาน · ' + fs.note + ' · ถ่ายใหม่' });   // ⚠ = inspect() แสดงเป็นคำเตือนพร้อมวิธีแก้
   }
   const { readImage } = await import('./image.js');
   const r = await readImage(file, ctx);
