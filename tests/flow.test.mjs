@@ -6,7 +6,7 @@ import * as F from '../js/flow.js';
 import { parse202, sameJob, apply202, inspect } from '../js/files.js';
 import { readFile } from '../js/readers/index.js';
 let n = 0; const ok = (c, m) => { n++; if (!c) { console.error('FAIL', m); process.exitCode = 1; } else console.log('PASS', m); };
-ok(SCHEDULE.length === 89 && !SCHEDULE.some(r => /[-]/.test(r.job + r.people)), 'ตาราง 89 งาน ไม่มีอักขระสระหาย');
+ok(SCHEDULE.length === 93 && new Set(SCHEDULE.map(r => r.id)).size === 93 && !SCHEDULE.some(r => /[-]/.test(r.job + r.people)), 'ตาราง 93 งาน (รวมหมุนเวียนตราด 13 รอบ) id ไม่ซ้ำ ไม่มีอักขระสระหาย');
 ok(SCHEDULE.find(r => r.id === 's69-12').job.includes('ด้านทิศเหนือ'), 'ด้านทิศเหนือ ถูกต้อง');
 const g = F.scheduleGroups(SCHEDULE, [], '2026-07-28', 'สมหมาย'); ok(g[0][2].every(r => r.ym === '2026-07') && g[1][2].every(r => r.ym === '2026-08') && g[0][2][0].people.includes('สมหมาย'), 'เดือนนี้/เดือนหน้า · ของฉันขึ้นก่อน');
 ok(F.addWorkdays('2026-08-06', 20) === '2026-09-03', '20 วันทำการ');
