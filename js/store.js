@@ -25,9 +25,11 @@ export const getFiles = () => be().getFiles();
 
 // งาน PM = jobs[]: ค่าที่พิมพ์/รูปเก็บในเครื่อง (localStorage 'pms.job.<id>') · งานที่ผู้ใช้สร้างเก็บรายการ id ไว้ที่ 'pms.jobx'
 export const listJobs = async () => {
-  const seed = await be().listJobs(), mine = (ls.get('pms.jobx') || []).map(id => ls.get('pms.job.' + id)).filter(Boolean);
+  const hid = ls.get('pms.jobhid') || [], seed = (await be().listJobs()).filter(j => !hid.includes(j.id)), mine = (ls.get('pms.jobx') || []).map(id => ls.get('pms.job.' + id)).filter(Boolean);
   return [...seed.map(j => ({ ...j, ...ls.get('pms.job.' + j.id) })), ...mine];
 };
+// ลบงาน (demo): งานที่ผู้ใช้สร้างลบจริง · งานตัวอย่างจาก backend ซ่อนไว้ (pms.jobhid)
+export const dropJob = id => { ls.set('pms.jobhid', [...(ls.get('pms.jobhid') || []), id]); ls.set('pms.jobx', (ls.get('pms.jobx') || []).filter(x => x !== id)); try { localStorage.removeItem('pms.job.' + id); } catch {} };
 export const putJob = job => ls.set('pms.job.' + job.id, job);
 export const newJob = async (sys, round, dates) => {
   const ids = new Set((await listJobs()).map(j => j.id)); let id = `${sys.id}-${round.replace('/', '-')}`; if (ids.has(id)) id += '-' + Date.now().toString(36);

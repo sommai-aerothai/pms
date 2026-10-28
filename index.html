@@ -39,10 +39,10 @@
  <!-- หน้าจอ: เนื้อหาวาดโดย js/views.js -->
  <section class="screen root" id="s-today"></section>
  <section class="screen root" id="s-pm"></section>
- <section class="screen root" id="s-reports"></section>
- <section class="screen root" id="s-docs"></section>
+  <section class="screen root" id="s-docs"></section>
  <section class="screen root" id="s-me"></section>
  <section class="screen push" id="s-job"></section>
+ <section class="screen push" id="s-reports"></section>
  <section class="screen push" id="s-years"></section>
  <section class="screen push" id="s-rounds"></section>
  <section class="screen push" id="s-kind"></section>
@@ -58,11 +58,11 @@
  <nav class="tabbar" aria-label="เมนูหลัก">
   <a href="#/today" aria-current="page"><svg class="ic"><use href="./ui/icons.svg#i-home"/></svg>วันนี้</a>
   <a href="#/pm"><svg class="ic"><use href="./ui/icons.svg#i-clip"/></svg>งาน PM</a>
-  <a href="#/reports"><svg class="ic"><use href="./ui/icons.svg#i-doc"/></svg>รายงาน</a>
   <a href="#/docs"><svg class="ic"><use href="./ui/icons.svg#i-folder"/></svg>เอกสาร</a>
   <a href="#/me"><svg class="ic"><use href="./ui/icons.svg#i-user"/></svg>ฉัน</a>
  </nav>
 
+ <button class="cta" id="cta" hidden></button>
  <div id="dim"></div>
  <button class="toast" id="toast" role="status"><svg class="ic"><use href="./ui/icons.svg#i-info"/></svg><span></span></button>
  <div class="bd" id="bd"></div>
