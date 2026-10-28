@@ -501,6 +501,7 @@ initGestures({ app, hasTab: d => TABS[TABS.indexOf(tab) + d] !== undefined, goTa
 M.init(app);
 (async () => {
   const u = store.pref('user'); S.user = u || { name: 'สมหมาย' }; app.classList.toggle('login', !u);
+  $('#lgDemo').hidden = real();   // ป้าย demo เฉพาะโหมดตัวอย่าง
   if (u && real() && !u.id) { try { u.id = JSON.parse(localStorage.getItem('pms.session')).user.id; } catch {} }   // ผู้ใช้ที่ล็อกอินก่อนรุ่นนี้: เติม id จาก session (ใช้แยกรายงานของฉัน)
   let ok = false;   // ยังไม่มีข้อมูล (ยังไม่ล็อกอิน/โหลดไม่ได้) = ไม่วาดหน้าจอ ไม่งั้นพัง
   if (u || !real()) { try { await load(); ok = true; } catch (e) { if (e.code === 'auth') { store.pref('user', null); app.classList.add('login'); } toast(errWord(e), 'warn'); } }
