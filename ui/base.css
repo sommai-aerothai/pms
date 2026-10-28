@@ -216,6 +216,9 @@ td.bad::after{content:"⚠︎ เกินช่วง";display:block;text-align
 .pad #s-reports>.in{max-width:none;margin:0}
 .pad #s-reports>.in .seg{max-width:var(--u-420)}
 .stl{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2)}
+.vfile{display:block;width:100%;height:var(--viewer-h);border:0;border-radius:var(--radius-card);background:var(--paper-bg)}
+.errc{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}.errc .btn{margin-left:auto}
+.errd .sec{margin:var(--space-2) var(--space-4);overflow-wrap:anywhere}
 .vbd{position:sticky;top:calc(var(--st) + var(--tap) + var(--space-2));z-index:3;height:0;text-align:center}
 [role=radio] .ck{color:var(--accent);visibility:hidden}[role=radio][aria-checked=true] .ck{visibility:visible}
 .search .cap{flex:none}

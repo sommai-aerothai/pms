@@ -1,6 +1,6 @@
-import { FM202_FIELDS, formsFor } from '../data/wi-scope.js';
+import { FM202_FIELDS } from '../data/wi-scope.js';
 import { SCHEDULE } from '../data/schedule-2569.js';
-import { newPmJob, normJob } from '../flow.js';
+import { newPmJob } from '../flow.js';
 // ข้อมูลจำลอง (โหมด demo) — โครง JSON ตาม spec §2: schema:1 · id ถาวร · เวลา ISO 8601 UTC
 // ตัวเลขทั้งหมดเป็นตัวอย่างสำหรับดูหน้าตา ไม่ใช่ค่าวัดจริง
 const D = (system, year, round, title, modified, pages, crew, status, extra = {}) => ({
@@ -36,12 +36,12 @@ const docs = [
 ];
 
 const T = (code, rev, name, pages, size, extra = {}) => ({ schema: 1, code, rev, name, pages, size, fetchedAt: '2026-10-28T02:00:00Z',
-  sourceUrl: `https://home.aerothai.co.th/cese/node/${extra.kind === 'wi' ? 524 : 526}`, sha256: '0'.repeat(64), kind: 'form', ...extra });
+  sourceUrl: `https://home.aerothai.co.th/cese/node/${extra.kind === 'WI' ? 524 : 526}`, sha256: '0'.repeat(64), kind: 'FM', ...extra });
 const templates = [
   T('FM-CE.SE-202', '04', 'ค่าวัดเครื่องส่ง', 2, 0.4e6, { prev: '03', isNew: true, changed: '2026-07-20' }),
   T('FM-CE.SE-501', '01', 'PM สายอากาศ', 1, 0.2e6), T('FM-CE.SE-502', '01', 'PM ไฟฟ้าสำรอง', 1, 0.2e6),
   T('FM-CE.SE-402', '03', 'PM CIMC', 2, 0.3e6, { offline: false }), T('FM-CE.SE-204', '02', 'แพร่สัญญาณแปลกปลอม', 1, 0.2e6),
-  T('WI-CE.SE-02', '06', 'เครื่องส่งวิทยุ', 60, 9e6, { kind: 'wi' }),
+  T('WI-CE.SE-02', '06', 'เครื่องส่งวิทยุ', 60, 9e6, { kind: 'WI' }),
 ];
 
 
@@ -77,9 +77,8 @@ function seedTx() {
 }
 
 // ---- สัญญา data layer (ตรงกับ supabase.js) ----
-export const listDocs = async ({ system, year } = {}) => ({
-  items: docs.filter(d => (!system || d.system === system) && (!year || d.year === +year)), next: null });
-export const getDocUrl = async () => null;          // ไม่มีไฟล์จริง → viewer วาดหน้าตัวอย่าง
+export const listExamples = async ({ system_id } = {}) => docs.filter(d => !system_id || d.system === system_id);
+export const signUrl = async () => null;          // ไม่มีไฟล์จริง → viewer วาดหน้าตัวอย่าง / ลิงก์เว็บกอง
 export const listTemplates = async () => templates;
 export const getBlob = async () => new Blob([]);
 export const getFiles = async () => files;
@@ -88,8 +87,6 @@ export const today = () => '2026-07-28';
 // ข้อมูลรอบก่อน (ตัวอย่าง): วิศวกรเฝ้าระวัง + เครื่องมือวัดที่ใช้รอบก่อน · การเดินทางจำต่อสถานีฝั่งแอป (pref) ไม่ใช่ที่นี่
 export const prevRound = site => ({ eng: ['ตัวอย่าง ก.', 'ตัวอย่าง ข.', 'ตัวอย่าง ค.'], travel: site === 'DM' ? 'รถยนต์' : '',
   tools: [['Test Set CMA180', '1-160-02231-0000', '2026-09-16'], ['ZVH8 Spectrum Analyzer', '1-160-03217-0000', '2026-12-01'], ['Digital Clamp Meter', '1-160-03155-0000', '2027-02-20'], ['Attenuator 30 dB', '1-160-02102', '2027-04-12']].map(([name, asset, due]) => ({ name, asset, due })) });
-// งานของ PM: โครง schema 2 (ดู flow.js newPmJob) · งานจาก backend โครงเดิมผ่าน normJob
-export const genericJob = (id, title, system, round, dates, status, touched) => normJob({ schema: 2, id, title, round, system, dates, status, touched, cur: 1, letter: false, forms: formsFor(title) });
 // งานเลยกำหนดส่ง (ตัวอย่าง): RCAG เขาพระบาท ลำปาง ทำเสร็จ 12 มิ.ย. → ครบ 20 วันทำการ 10 ก.ค. → เลยกำหนด
 function seedLate() {
   const row = SCHEDULE.find(r => r.job.startsWith('สถานี RCAG เขาพระบาท') && r.ym === '2026-07');
