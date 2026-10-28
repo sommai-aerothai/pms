@@ -141,4 +141,18 @@ ok(na.code === 'auth' && hit === 0, 'ไม่มี session → auth (ไม่
   ok(nm('FM-CE.SE-005', 'FM-CE.SE-005 ชื่อไฟล์เก่า.pdf', 'FM-CE.SE-005 ชื่อจริงจากฐาน') === 'ชื่อจริงจากฐาน' && nm('FM-CE.SE-005', 'FM-CE.SE-005 ชื่อไฟล์เก่า.pdf', 'งาน PM') === 'งาน PM', 'title ในฐานที่เป็นชื่อจริงชนะชื่อจากไฟล์ (และไม่โดนตัดคำท้าย)');
 }
 
+// ---------- examples เกิน max-rows ของ PostgREST (1000): listExamples/getCatalog ต้องดึงทุกหน้า ไม่ตกหล่นเงียบ ----------
+{
+  const be = await import('../js/backend/supabase.js'), ROWS = Array.from({ length: 1500 }, (_, i) => ({ id: i + 1, system_id: 'S', fiscal_year: 2569 })), ranges = [];
+  localStorage.setItem('pms.session', JSON.stringify({ access_token: 'T', refresh_token: 'R', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'u1' } }));
+  globalThis.fetch = async (u, o) => {   // เซิร์ฟเวอร์ตัดหน้าที่ 1000 แถวเสมอ (max-rows) แม้ขอมากกว่า
+    if (new URL(u).pathname !== '/rest/v1/examples') return json([]);
+    const [a, b] = o.headers.Range.split('-').map(Number), page = ROWS.slice(a, Math.min(b, a + 999) + 1); ranges.push(o.headers.Range);
+    return json(page, 206, { 'Content-Range': page.length ? `${a}-${a + page.length - 1}/${ROWS.length}` : `*/${ROWS.length}` });
+  };
+  const all = await be.listExamples();
+  ok(all.length === 1500 && new Set(all.map(r => r.id)).size === 1500 && all[0].id === 1 && all.at(-1).id === 1500 && ranges.length === 2, 'listExamples: 2 หน้า (1000+500) ได้ครบ 1500 แถว ไม่ซ้ำ เรียงต่อกัน');
+  ok((await be.getCatalog()).examples.length === 1500, 'getCatalog: นับ examples ครบทุกหน้า (จำนวน/ปีต่อระบบไม่ขาด)');
+}
+
 console.log(`\n${n} ข้อ · ${process.exitCode ? 'มีข้อไม่ผ่าน' : 'ผ่านทั้งหมด'}`);

@@ -3,7 +3,7 @@
 import { CONFIG } from '../config.js';
 import { groupDocs } from '../shapes.js';
 
-const SK = 'pms.session', PAGE = 50, TEMPLATE_KINDS = ['FM', 'WI', 'QP', 'QM'];
+const SK = 'pms.session', PAGE = 50, PAGE_ALL = 1000, TEMPLATE_KINDS = ['FM', 'WI', 'QP', 'QM'];
 const ls = { get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 const fail = (code, retryAfter = 0, more = {}) => { throw { code, retryAfter, ...more }; };
 // ข้อความผิดพลาดจากเซิร์ฟเวอร์ (PostgREST: code/message/details/hint · Auth: error/error_description · Storage: error/message) สั้นพอแสดงใน "รายละเอียด"
@@ -48,7 +48,7 @@ export const me = async () => { const s = session(); if (!s) fail('auth'); const
 // ---- ข้อมูล (แถวดิบ · shapes.js แปลงที่ store.js) ----
 // catalog = ระบบ + examples (เฉพาะคอลัมน์ที่ใช้นับ) → shapes.catalog คิดจำนวน/ปีต่อระบบ
 export const getCatalog = async () => {
-  const [systems, examples] = await Promise.all([rest('systems?order=seq&select=*'), rest('examples?select=system_id,fiscal_year')]);
+  const [systems, examples] = await Promise.all([rest('systems?order=seq&select=*'), restAll('examples?select=system_id,fiscal_year&order=id')]);
   return { systems, examples };
 };
 // เรียงตาม id (ไม่ซ้ำ ไม่เป็น null) → แบ่งหน้าคงที่ · Content-Range = "0-49/123" หรือ "*/0" · อ่านไม่ได้ = ดูจากจำนวนแถวที่ได้
@@ -59,7 +59,16 @@ export const listDocs = async ({ kind, cursor = 0 } = {}) => {
   return { items, next: more && items.length ? cursor + items.length : null };
 };
 export const listTemplates = async () => rest(`documents?select=*&is_current=eq.true&kind=in.(${TEMPLATE_KINDS.join(',')})&order=id`);
-export const listExamples = ({ system_id } = {}) => rest(`examples?select=*&order=created_at.desc,id${system_id ? `&system_id=eq.${encodeURIComponent(system_id)}` : ''}`);
+// ดึงทุกหน้าจนครบ (PostgREST ตัดที่ max-rows ~1000 เงียบๆ) · query ต้องมี order ที่ไม่ซ้ำ · หยุดเมื่อได้ครบ total หรือหน้าสั้น/ว่าง
+const restAll = async q => {
+  const all = []; let cur = 0;
+  for (;;) {
+    const r = await rest(q, { headers: { Range: `${cur}-${cur + PAGE_ALL - 1}`, 'Range-Unit': 'items', Prefer: 'count=exact' }, raw: true });
+    const items = (await r.json().catch(() => null)) || [], total = totalOf(r); all.push(...items); cur += items.length;
+    if (!items.length || (total == null ? items.length < PAGE_ALL : cur >= total)) return all;
+  }
+};
+export const listExamples = ({ system_id } = {}) => restAll(`examples?select=*&order=created_at.desc,id${system_id ? `&system_id=eq.${encodeURIComponent(system_id)}` : ''}`);
 export const getFiles = async () => {   // หมวดเอกสารหน้า "เอกสาร" — ทุกหน้าจนครบ แล้วจัดกลุ่มด้วย KIND_CAT (shapes.js)
   const all = []; let cur = 0;
   do { const p = await listDocs({ cursor: cur }); all.push(...p.items); cur = p.next; } while (cur != null);
