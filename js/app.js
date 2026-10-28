@@ -4,13 +4,14 @@ import * as V from './views.js';
 import { initGestures } from './gestures.js';
 import * as photos from './photos.js';
 import { tok } from './tok.js';
+import * as M from './motion.js';
 import { CONFIG } from './config.js';
 
-const VERSION = 'v0.5';
+const VERSION = 'v0.6';
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const app = $('#app'), TABS = ['today', 'pm', 'reports', 'docs', 'me'];
-const TITLES = { today: 'วันนี้', pm: 'งาน PM', reports: 'รายงาน', docs: 'เอกสาร', me: 'ฉัน' };
-const S = { ph: {}, rev: 0, ui: {}, version: VERSION, user: null, docs: [], templates: [], catalog: null, cats: [], files: [], jobs: [], job: null };
+const app = $('#app'), TABS = ['today', 'pm', 'docs', 'me'];
+const TITLES = { today: 'วันนี้', pm: 'งาน PM', docs: 'เอกสาร', me: 'ฉัน' };
+const S = { ph: {}, rev: 0, ui: {}, wait: new Set(), seen: new Set(), version: VERSION, user: null, docs: [], templates: [], catalog: null, cats: [], files: [], jobs: [], job: null };
 const pad = matchMedia(`(min-width:${tok('bp-pad')}px)`);
 let chain = [], tab = 'today', lastTab = null, lastHash = {}, saveT, toastT, tapFn = null, reveal = false;
 
@@ -26,7 +27,7 @@ async function loadPhotos() {
 }
 const errWord = e => ({ auth: 'ต้องเข้าสู่ระบบใหม่', server: 'เซิร์ฟเวอร์มีปัญหา ลองใหม่อีกครั้ง', conflict: 'มีคนแก้งานนี้ก่อน โหลดใหม่แล้วลองอีกครั้ง', offline: 'ออฟไลน์อยู่', invalid: 'ข้อมูลไม่ถูกต้อง', notfound: 'ไม่พบข้อมูล', throttled: 'ระบบยุ่ง ลองใหม่อีกครั้ง' }[e.code] || 'เกิดข้อผิดพลาด');
 async function refresh() {
-  try { [S.docs, S.templates, S.cats] = [(await store.listDocs()).items, await store.listTemplates(), await store.getFiles()]; S.files = S.cats.flatMap(c => c.rows); S.rev++; draw(); toast('รีเฟรชแล้ว', 'ok'); }
+  try { [S.docs, S.templates, S.cats] = [(await store.listDocs()).items, await store.listTemplates(), await store.getFiles()]; S.files = S.cats.flatMap(c => c.rows); if (saveT) save();   /* บันทึกค่าค้างก่อน ไม่งั้นโหลดทับของเก่า */ const cur = S.job && S.job.id; S.jobs = await store.listJobs(); S.job = S.jobs.find(j => j.id === cur) || V.recent(S) || S.jobs[0]; S.rev++; draw(); toast('รีเฟรชแล้ว', 'ok'); }
   catch (e) { toast(errWord(e), 'warn'); }
 }
 
@@ -37,9 +38,10 @@ function resolve() {
   const t = p[0]; let rest = p.slice(1), doc = null;
   const di = rest.indexOf('doc'); if (di > -1) { doc = rest[di + 1]; rest = rest.slice(0, di); }
   const st = [], sysName = id => (S.catalog.systems.find(s => s.id === id) || {}).name || id;
-  if (t === 'reports') {
-    if (rest[0] === 'by' && rest.length > 2) st.push({ id: 's-rounds', arg: [0, 0, rest[1], rest[2]], title: rest[2] });
-    else if (rest[0]) { st.push({ id: 's-years', arg: rest[0], title: sysName(rest[0]) }); if (rest[1]) st.push({ id: 's-rounds', arg: [rest[0], rest[1]], title: rest[1] }); }
+  if (t === 'docs' && rest[0] === 'reports') {   // เอกสาร › รายงาน › ระบบ/ปี › รอบ
+    const r = rest.slice(1); st.push({ id: 's-reports', title: 'รายงาน' });
+    if (r[0] === 'by' && r.length > 2) st.push({ id: 's-rounds', arg: [0, 0, r[1], r[2]], title: r[2] });
+    else if (r[0]) { st.push({ id: 's-years', arg: r[0], title: sysName(r[0]) }); if (r[1]) st.push({ id: 's-rounds', arg: [r[0], r[1]], title: r[1] }); }
   } else if (t === 'docs') {
     const c = rest[0] === 'k' && S.cats.find(x => x.id === rest[1]); if (c) st.push({ id: 's-kind', arg: c.id, title: c.name });
   } else if (t === 'pm') {
@@ -64,7 +66,10 @@ function paint(c, i) {
   if (c.id === 's-fill') stripScroll(fresh, x);
 }
 function draw() {
-  const r = resolve(), changed = r.tab !== lastTab; tab = r.tab; chain = r.chain;
+  const r = resolve(), changed = r.tab !== lastTab, from = lastTab; tab = r.tab; chain = r.chain;
+  // รายการเอกสาร/รายงาน: โหลดครั้งแรกแสดงโครง skeleton ก่อน (demo จำลองรอ --skel-ms)
+  const wk = { 's-docs': 'docs', 's-reports': 'reports' }[chain[chain.length - 1].id];
+  if (wk && !S.seen.has(wk)) { S.seen.add(wk); S.wait.add(wk); setTimeout(() => { S.wait.delete(wk); S.rev++; draw(); }, tok('skel-ms')); }
   chain.forEach(paint);
   const ids = chain.slice(1).map(c => c.id), n = ids.length;
   if (changed) app.classList.add('nq');
@@ -72,32 +77,34 @@ function draw() {
     s.classList.toggle('on', on); s.classList.toggle('under', on && n > 0 && (root || k < n - 1)); if (k > -1) s.style.zIndex = 2 * (k + 1); });
   $('#dim').style.zIndex = 2 * n - 1; $('#dim').classList.toggle('on', n > 0);
   $$('.tabbar a').forEach((a, i) => TABS[i] === tab ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
-  $('.tabbar').classList.remove('mini');
-  if (changed) { app.offsetWidth; app.classList.remove('nq'); }
+  $('.tabbar').classList.remove('mini'); drawCta();
+  if (changed) { if (from) M.tabSwitch($('#s-' + from), $('#s-' + tab), Math.sign(TABS.indexOf(tab) - TABS.indexOf(from))); app.offsetWidth; app.classList.remove('nq'); }
+  M.sync(); S.ui.added = null;
   lastTab = tab; lastHash[tab] = location.hash.split('/doc/')[0];
 }
-// ลิงก์เก่า: #/home → #/today · #/man → #/docs/k/fm · #/docs/<ระบบ…> (รายงาน) → #/reports/… · #/pm/fill → #/pm/<งานเดิม>/fill · #/me อยู่เหมือนเดิม
+// ลิงก์เก่า: #/home → #/today · #/man → #/docs/k/fm · #/reports/… และ #/docs/<ระบบ…> (รายงาน) → #/docs/reports/… · #/pm/fill → #/pm/<งานเดิม>/fill · #/me อยู่เหมือนเดิม
 function migrate() {
   const h = location.hash; let n = null, m;
   if ((m = h.match(/^#\/home(\/.*)?$/))) n = '#/today' + (m[1] || '');
   else if ((m = h.match(/^#\/man(\/.*)?$/))) n = '#/docs/k/fm';
-  else if ((m = h.match(/^#\/docs\/(?!k\/|doc\/)(.+)$/))) n = '#/reports/' + m[1];
-  else if ((m = h.match(/^#\/pm\/(fill|table|asset|tools|folder)$/))) n = '#/pm/dm-txs-3-69/' + m[1];
+  else if ((m = h.match(/^#\/reports(\/.*)?$/))) n = '#/docs/reports' + (m[1] || '');
+  else if ((m = h.match(/^#\/docs\/(?!k\/|doc\/|reports(\/|$))(.+)$/))) n = '#/docs/reports/' + m[1];
+  else if ((m = h.match(/^#\/pm\/(fill|table|asset|tools|folder)$/))) n = '#/pm/dm-txs-1-70/' + m[1];
   if (n) history.replaceState(null, '', n);
 }
 const go = h => { location.hash = h; };
 function pop() {
   if (document.activeElement) document.activeElement.blur();
   const p = parts(), di = p.indexOf('doc');
-  go('#/' + (di > -1 ? p.slice(0, di) : p[1] === 'by' ? ['reports'] : p.slice(0, -1)).join('/'));
+  go('#/' + (di > -1 ? p.slice(0, di) : p[2] === 'by' ? p.slice(0, 2) : p.slice(0, -1)).join('/'));
 }
 
 // ---------- sheet / toast ----------
 let opener = null;
 const bg = () => [...app.children].filter(c => !['sheet', 'bd', 'toast'].includes(c.id));
-function openSheet(kind, id) {
+function openSheet(kind, id, html) {
   opener = document.activeElement; const sh = $('#sheet');
-  sh.innerHTML = V.sheet(S, kind, id); sh.classList.add('open'); $('#bd').classList.add('open');
+  sh.innerHTML = html ?? V.sheet(S, kind, id); M.sync(sh); sh.classList.add('open'); $('#bd').classList.add('open');
   bg().forEach(c => c.inert = true); sh.setAttribute('tabindex', '-1'); $('.sh-h button', sh).focus();
 }
 function closeSheet() {
@@ -119,7 +126,8 @@ addEventListener('pagehide', () => saveT && save());
 document.addEventListener('visibilitychange', () => document.hidden && saveT && save());
 function progress() {
   const j = S.job, k = V.txDoneCount(j);
-  $$('.prg').forEach(p => { $('.cap', p).textContent = `${j.cur} จาก ${j.tx.length} · เสร็จ ${k}`; $('.bar3 i', p).style.width = 100 * k / j.tx.length + '%'; });
+  $$('.prg').forEach(p => { $('.cap', p).innerHTML = `${j.cur} จาก ${j.tx.length} · เสร็จ <span class="cnt" data-v="${k}">${k}</span>`; $('.bar3 i', p).style.width = 100 * k / j.tx.length + '%'; });
+  M.sync($('#s-fill,#s-table', document) || document);
 }
 function setVal(n, k, v) {
   const t = S.job.tx[n - 1], f = S.job.fields.find(x => x.k === k); t.v[k] = v; later();
@@ -176,20 +184,56 @@ async function removePhoto(key) {
 
 // ---------- สร้างงานใหม่ (sheet เริ่มงานใหม่) ----------
 async function createJob() {
-  const sys = S.catalog.systems.find(x => x.id === ($('[data-sys][aria-checked=true]') || {}).dataset?.sys), round = $('#nrd').value.trim(), a = $('#nd1').value, b = $('#nd2').value;
+  const sys = S.catalog.systems.find(x => x.id === ($('[data-sys][aria-checked=true]') || {}).dataset?.sys), a = $('#nd1').value, b = $('#nd2').value, rd = ($('[data-rd][aria-pressed=true]') || {}).dataset?.rd;
   if (!sys) return toast('เลือกระบบก่อน', 'warn');
-  if (!/^\d{1,2}\/\d{2}$/.test(round)) return toast('ใส่ครั้งที่ เช่น 3/69', 'warn');
   if (!a || !b || b < a) return toast('ตรวจช่วงวันที่อีกครั้ง', 'warn');
+  const round = `${rd}/${String(V.fiscal(a).fy).slice(2)}`;   // ครั้งที่ที่เลือก + ปีงบฯ ของวันเริ่มงาน
   const j = await store.newJob(sys, round, [a, b]); if (!j) return toast('พื้นที่เก็บเต็ม — สร้างงานไม่ได้', 'warn', null, 3500);
-  S.jobs.push(j); closeSheet(); S.rev++; go('#/pm/' + j.id); toast('สร้างงานแล้ว', 'ok');
+  S.jobs.push(j); S.ui.added = j.id; closeSheet(); S.rev++; go('#/pm/' + j.id); toast('สร้างงานแล้ว', 'ok');
+}
+
+// ปัดแถวงาน: ลบ (ยังไม่เริ่ม) / ปิดงาน (กำลังทำ) — ตัวอย่างสำหรับ demo
+function jobAct(id) {
+  const jb = S.jobs.find(x => x.id === id); if (!jb) return;
+  if (jb.status === 'todo') M.collapse($(`[data-job-act="${id}"]`)?.closest('.swr'), () => { store.dropJob(id); S.jobs = S.jobs.filter(x => x !== jb); if (S.job === jb) S.job = V.recent(S) || S.jobs[0]; S.rev++; draw(); toast('ลบงานแล้ว', 'trash'); });
+  else { jb.status = 'done'; jb.touched = new Date().toISOString(); store.putJob(jb); S.rev++; draw(); toast('ปิดงานแล้ว', 'ok'); }
+}
+
+// ---------- CTA ลอยเหนือ dock: ปุ่มเดียวทุกหน้า · กว้างเท่ากันหมด (วัดจากป้ายที่กว้างสุดครั้งเดียว) ----------
+const CTA = { new: ['plus', 'เริ่มงานใหม่'], newReport: ['doc', 'ออกรายงานใหม่'], start: ['ok', 'เริ่มงาน'], report: ['doc', 'ออกรายงาน'] };
+const ctaHtml = (i, t) => `${V.ic(i)}<span>${t}</span>`;
+function measureCta() {
+  const m = $('#cta').cloneNode(), n = Math.max(10, ...S.jobs.map(j => j.forms.length)), labels = [...Object.values(CTA).map(x => x.slice()), ['clip', `ตรวจความพร้อม · ${n}/${n}`]];
+  m.removeAttribute('id'); m.hidden = false; m.style.cssText = 'position:absolute;display:flex;visibility:hidden;width:auto;left:0;transform:none;max-width:none';
+  app.append(m);
+  const w = Math.ceil(Math.max(...labels.map(([i, t]) => { m.innerHTML = ctaHtml(i, t); return m.getBoundingClientRect().width; })));
+  m.remove(); document.documentElement.style.setProperty('--cta-w', w + 'px');
+}
+let ctaMeasured = false;
+function drawCta() {
+  const top = chain[chain.length - 1], el = $('#cta'), j = top.id === 's-job' && S.jobs.find(x => x.id === top.arg);
+  const c = top.id === 's-pm' ? ['new', ...CTA.new] : top.id === 's-reports' ? ['new', ...CTA.newReport] : j ? V.jobCta(j) : null;
+  app.classList.toggle('cta-on', !!c); el.hidden = !c;
+  if (!c) return;
+  el.dataset.act = c[0]; el.innerHTML = ctaHtml(c[1], c[2]);
+  if (!ctaMeasured) { ctaMeasured = true; (document.fonts ? document.fonts.ready : Promise.resolve()).then(measureCta); }
+}
+function ctaGo() {
+  const a = $('#cta').dataset.act;
+  if (a === 'new') openSheet('new', '');
+  else if (a === 'ready') openSheet('ready');
+  else if (a === 'report') toast('ออกรายงานทำในขั้น 2');
+  else if (a === 'start') { S.job.status = 'doing'; S.job.touched = new Date().toISOString(); store.putJob(S.job); S.rev++; draw(); toast('เริ่มงานแล้ว', 'ok'); }
 }
 
 // ---------- เหตุการณ์ ----------
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-start],[data-sys],[data-create],[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],#bd');
+  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-start],[data-sys],[data-job-act],[data-rd],[data-web],#cta,[data-create],[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],#bd');
   if (!t) return; const d = t.dataset;
   if (d.pre) { const [k, v] = d.pre.split(':'); if (k === 'cur') { const jb = S.jobs.find(x => x.id === d.pre.split(':')[2]); if (jb) { jb.cur = +v; if (jb === S.job) sched(); else store.putJob(jb); } } else S.ui[k] = v; S.rev++; }
-  if (d.start) { const jb = S.jobs.find(x => x.id === d.start); jb.status = 'doing'; jb.touched = new Date().toISOString(); store.putJob(jb); S.rev++; draw(); toast('เริ่มงานแล้ว', 'ok'); }
+  if (t.id === 'cta') ctaGo();
+  else if ('web' in d) { S.ui.webClosed = !S.ui.webClosed; t.setAttribute('aria-expanded', !S.ui.webClosed); $('#dcats').hidden = S.ui.webClosed; }
+  else if (d.rd) $$('[data-rd]').forEach(b => b.setAttribute('aria-pressed', b === t));
   else if (d.sys) { $$('[data-sys]').forEach(b => b.setAttribute('aria-checked', b === t)); }
   else if ('create' in d) createJob();
   else if ('peek' in d) { const i = $('input', t.parentNode), on = i.type === 'password'; i.type = on ? 'text' : 'password'; t.setAttribute('aria-pressed', on); t.setAttribute('aria-label', on ? 'Hide password' : 'Show password'); $('use', t).setAttribute('href', `./ui/icons.svg#i-${on ? 'eyeoff' : 'eye'}`); }
@@ -197,14 +241,15 @@ document.addEventListener('click', e => {
   else if ('recheck' in d) finishLogin(true);
   else if (d.be) { store.setBackend(d.be); store.pref('user', null); location.reload(); }   // เปลี่ยน backend = ล็อกอินใหม่
   else if ('back' in d) { e.preventDefault(); pop(); }
-  else if (t.closest('.tabbar')) { e.preventDefault(); const n = TABS[$$('.tabbar a').indexOf(t)]; if (t.closest('.mini')) $('.tabbar').classList.remove('mini'); else go(n === tab ? '#/' + n : lastHash[n] || '#/' + n); }
+  else if (t.closest('.tabbar')) { e.preventDefault(); const n = TABS[$$('.tabbar a').indexOf(t)]; if (t.closest('.mini')) $('.tabbar').classList.remove('mini'); else if (n === tab) { const sc = $('#' + chain[chain.length - 1].id); if (sc.scrollTop > 0) sc.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); else if (chain.length > 1) go('#/' + n); } else go(lastHash[n] || '#/' + n); }
   else if (d.sheet) { const [k, id] = d.sheet.split(':'); openSheet(k, id); }
   else if (t.id === 'bd' || 'close' in d) closeSheet();
   else if (t.classList.contains('sw')) {
     const on = t.getAttribute('aria-checked') !== 'true'; t.setAttribute('aria-checked', on); $('span', t).textContent = on ? 'เปิด' : 'ปิด';
     if (d.off) { store.setOffline(d.off, on); S.rev++; draw(); } else if (d.pref) store.pref(d.pref, on);
   }
-  else if (d.offAct) { const on = !V.isOff(S, d.offAct); store.setOffline(d.offAct, on); S.rev++; draw(); toast(on ? 'เก็บไว้ดู offline แล้ว' : 'ลบออกจาก offline แล้ว', on ? 'dl' : 'trash'); }
+  else if (d.jobAct) { closeSheet(); jobAct(d.jobAct); }
+  else if (d.offAct) { closeSheet(); const on = !V.isOff(S, d.offAct); store.setOffline(d.offAct, on); S.rev++; draw(); toast(on ? 'เก็บไว้ดู offline แล้ว' : 'ลบออกจาก offline แล้ว', on ? 'dl' : 'trash'); }
   else if (d.pane) { $$('button', t.parentNode).forEach(b => b.setAttribute('aria-pressed', b === t)); $$(':scope > .pane', $('#' + d.pane).parentNode).forEach(p => { p.hidden = p.id !== d.pane; }); if (/^[pr]-/.test(d.pane)) S.ui[d.pane[0]] = d.pane; }
   else if ('toast' in d) toast(d.toast);
   else if ('cam' in d) { camTarget = d.cam; $('#cam').click(); }
@@ -220,8 +265,8 @@ document.addEventListener('click', e => {
 document.addEventListener('input', e => {
   const i = e.target;
   if (i.dataset.k) setVal(+i.dataset.n, i.dataset.k, i.value);
-  else if (i.dataset.filter === 'docs') { const q = i.value.trim().toLowerCase(), r = $('#dres'); $('#dcats').hidden = !!q; r.hidden = !q; if (q) r.innerHTML = V.searchFiles(S, q); }
-  else if ('filter' in i.dataset) { const q = i.value.trim().toLowerCase(); $$('.swr,.grp>.row', i.closest('.screen')).forEach(w => { w.hidden = !w.textContent.toLowerCase().includes(q); }); }
+  else if (i.dataset.filter === 'docs') { const q = i.value.trim().toLowerCase(), r = $('#dres'); $('#dhome').hidden = !!q; r.hidden = !q; if (q) { r.innerHTML = V.searchAll(S, q); M.stagger($$('.swr', r)); } }
+  else if ('filter' in i.dataset) { const q = i.value.trim().toLowerCase(), shown = []; $$('.swr,.grp>.row', i.closest('.screen')).forEach(w => { const h = !w.textContent.toLowerCase().includes(q); if (w.hidden && !h) shown.push(w); w.hidden = h; }); M.stagger(shown); }
 });
 // แถบเหนือคีย์บอร์ด (หน้ากรอกค่า iPhone) + ตารางตัวเลือกช่องของ iPad
 let kt;
@@ -241,7 +286,7 @@ document.addEventListener('keydown', e => {
 });
 $('#kbar').addEventListener('pointerdown', e => e.preventDefault());   // ไม่ให้ช่องกรอกเสียโฟกัส
 const vv = window.visualViewport;
-if (vv) { const kb = () => { const r = document.documentElement.style; r.setProperty('--kbh', Math.max(0, innerHeight - vv.height - vv.offsetTop) + 'px'); r.setProperty('--kbt', vv.offsetTop + vv.height - tok('kbar-h') + 'px'); }; vv.addEventListener('resize', kb); vv.addEventListener('scroll', kb); }
+if (vv) { const kb = () => { const r = document.documentElement.style, h = Math.max(0, innerHeight - vv.height - vv.offsetTop); r.setProperty('--kbh', h + 'px'); app.classList.toggle('kbo', h > tok('kbar-h')); r.setProperty('--kbt', vv.offsetTop + vv.height - tok('kbar-h') + 'px'); }; vv.addEventListener('resize', kb); vv.addEventListener('scroll', kb); }
 // ไถลง = dock ย่อ · title ใหญ่ยุบเข้า nav
 let sa = 0;
 app.addEventListener('scroll', e => {
@@ -301,7 +346,8 @@ matchMedia('(prefers-color-scheme:dark)').addEventListener('change', themeColor)
 const setPad = () => { document.body.classList.toggle('pad', pad.matches); if (S.job) draw(); };
 pad.addEventListener('change', setPad); document.body.classList.toggle('pad', pad.matches);
 addEventListener('hashchange', () => { migrate(); closeSheet(); draw(); });
-initGestures({ app, depth: () => chain.length - 1, top: () => $('#' + chain[chain.length - 1].id), parent: () => $('#' + chain[chain.length - 2].id), pop, closeSheet, setM: n => setM(n, true), cur: () => S.job.cur, refresh, isPad: () => pad.matches });
+initGestures({ app, hasTab: d => TABS[TABS.indexOf(tab) + d] !== undefined, goTab: d => { const n = TABS[TABS.indexOf(tab) + d]; if (n) go(lastHash[n] || '#/' + n); }, longPress: w => { const a = $('.swa', w); if (a) { navigator.vibrate?.(10); openSheet('act', '', V.actSheet($('.rt span', w).textContent, a)); } }, depth: () => chain.length - 1, top: () => $('#' + chain[chain.length - 1].id), parent: () => $('#' + chain[chain.length - 2].id), pop, closeSheet, setM: n => setM(n, true), cur: () => S.job.cur, refresh, isPad: () => pad.matches });
+M.init(app);
 (async () => {
   const u = store.pref('user'); S.user = u || { name: 'สมหมาย' }; app.classList.toggle('login', !u);
   let ok = false;   // ยังไม่มีข้อมูล (ยังไม่ล็อกอิน/โหลดไม่ได้) = ไม่วาดหน้าจอ ไม่งั้นพัง

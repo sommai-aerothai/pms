@@ -14,7 +14,7 @@ export const catalog = {
     ['vccs-bk', 'DM VCCS Backup', 'หอฯ ด้านทิศเหนือ', 'headset', 22], ['vccs', 'DM VCCS', 'หอฯ ด้านทิศใต้', 'headset', 44]]
     .map(([id, name, loc, icon, count]) => ({ id, name, loc, icon, count })),
   // จำนวนรายงานต่อปี (ตัวอย่าง): radio ตามแล็บ · ระบบอื่นแบ่งตามสัดส่วน
-  years: { 'tx-stby': { 2569: 14, 2568: 41, 2567: 38, 2566: 35 } },
+  years: { 'tx-stby': { 2570: 1, 2569: 14, 2568: 41, 2567: 38, 2566: 35 }, 'tx-bk1': { 2570: 1, 2569: 12, 2568: 9, 2567: 8 } },
 };
 // ปีของแต่ละระบบอยู่ใน catalog (backend จริงส่งโครงเดียวกัน) · หน้าจอไม่เรียก demo ตรง
 catalog.systems.forEach(sys => {
@@ -22,14 +22,15 @@ catalog.systems.forEach(sys => {
   sys.years = Object.entries(y).sort((a, b) => b[0] - a[0]).map(([year, count]) => ({ year: +year, count }));
 });
 
+// รอบ PM มีแค่ 2 ครั้ง/ปีงบประมาณ: ครั้งที่ 1 = ต.ค.–มี.ค. · ครั้งที่ 2 = เม.ย.–ก.ย. (ปีงบฯ 2570 เริ่ม 1 ต.ค. 2569)
+const ME = 'สมหมาย';
 const docs = [
-  D('tx-stby', 2569, '3/69', 'PM DM TX Radio STBY ครั้งที่ 3/69', '2026-10-26T03:00:00Z', 19, 2, 'draft', { dates: ['2026-11-12', '2026-11-14'] }),
-  D('tx-stby', 2569, '2/69', 'PM DM TX Radio STBY ครั้งที่ 2/69', '2026-10-24T03:00:00Z', 21, 2, 'accepted', { dates: ['2026-08-04', '2026-08-06'] }),
-  D('rx-stby', 2569, '2/69', 'PM DM RX Radio STBY ครั้งที่ 2/69', '2026-07-20T03:00:00Z', 17, 2, 'review', { dates: ['2026-07-18', '2026-07-19'] }),
-  D('tx-stby', 2569, '1/69', 'PM DM TX Radio STBY ครั้งที่ 1/69', '2026-04-14T03:00:00Z', 20, 3, 'accepted', { dates: ['2026-04-10', '2026-04-12'] }),
-  D('tx-stby', 2568, '3/68', 'PM DM TX Radio STBY ครั้งที่ 3/68', '2025-11-16T03:00:00Z', 20, 2, 'accepted', { dates: ['2025-11-13', '2025-11-15'] }),
-  D('tx-stby', 2568, '2/68', 'PM DM TX Radio STBY ครั้งที่ 2/68', '2025-08-08T03:00:00Z', 19, 2, 'accepted', { dates: ['2025-08-05', '2025-08-07'] }),
-  D('tx-bk1', 2569, '1/69', 'PM DM TX Radio Backup 1 ครั้งที่ 1/69', '2026-10-08T03:00:00Z', 14, 2, 'accepted', { dates: ['2026-10-06', '2026-10-07'] }),
+  D('tx-stby', 2570, '1/70', 'PM DM TX Radio STBY ครั้งที่ 1/70', '2026-10-26T03:00:00Z', 19, 2, 'draft', { dates: ['2026-11-12', '2026-11-14'], origin: 'app', by: ME, performers: [ME, 'วิทยา'] }),
+  D('tx-stby', 2569, '2/69', 'PM DM TX Radio STBY ครั้งที่ 2/69', '2026-10-24T03:00:00Z', 21, 2, 'accepted', { dates: ['2026-08-04', '2026-08-06'], performers: [ME, 'ปริญญา'] }),
+  D('rx-stby', 2569, '2/69', 'PM DM RX Radio STBY ครั้งที่ 2/69', '2026-07-20T03:00:00Z', 17, 2, 'review', { dates: ['2026-07-18', '2026-07-19'], performers: ['ปริญญา', 'วิทยา'] }),
+  D('tx-stby', 2569, '1/69', 'PM DM TX Radio STBY ครั้งที่ 1/69', '2025-11-16T03:00:00Z', 20, 2, 'accepted', { dates: ['2025-11-13', '2025-11-15'], performers: ['ปริญญา', 'วิทยา'] }),
+  D('tx-stby', 2568, '2/68', 'PM DM TX Radio STBY ครั้งที่ 2/68', '2025-08-08T03:00:00Z', 19, 2, 'accepted', { dates: ['2025-08-05', '2025-08-07'], performers: ['ปริญญา', 'วิทยา'] }),
+  D('tx-bk1', 2570, '1/70', 'PM DM TX Radio Backup 1 ครั้งที่ 1/70', '2026-10-08T03:00:00Z', 14, 2, 'accepted', { dates: ['2026-10-06', '2026-10-07'], performers: ['ปริญญา', 'วิทยา'] }),
 ];
 
 const T = (code, rev, name, pages, size, extra = {}) => ({ schema: 1, code, rev, name, pages, size, fetchedAt: '2026-10-28T02:00:00Z',
@@ -70,7 +71,7 @@ function seedTx() {
     return { n, freq, model: 'PAE T6T', reg: reg(n), v, photos: {} };
   });
   return {
-    schema: 1, id: 'dm-txs-3-69', title: 'DM TX Radio STBY 3/69', round: '3/69', status: 'doing', touched: '2026-10-27T10:00:00Z', system: 'tx-stby', dates: ['2026-11-12', '2026-11-14'], letter: true, cur: 7, fields, tx, assetCheck: [6, 7, 8],
+    schema: 1, id: 'dm-txs-1-70', title: 'DM TX Radio STBY 1/70', round: '1/70', status: 'doing', touched: '2026-10-27T10:00:00Z', system: 'tx-stby', dates: ['2026-11-12', '2026-11-14'], letter: true, cur: 7, fields, tx, assetCheck: [6, 7, 8],
     forms: [['FM-CE.SE-202', 'เครื่องส่ง (21 เครื่อง)', 'tx'], ['FM-CE.SE-501', 'สายอากาศ (19 ต้น)'], ['FM-CE.SE-502', 'ไฟฟ้าสำรอง'], ['FM-CE.SE-402', 'CIMC'],
       ['FM-CE.SE-204', 'Spurious (รูป 2)', 'todo', 'cam'], ['FM-CE.SE-041', 'ก่อน/หลัง', 'done'], ['FM-CE.SE-005', 'เครื่องมือวัด', 'done', 'tools'],
       ['FM-CE.SE-001', 'ทะเบียนอุปกรณ์', 'asset'], ['', 'ใบตรวจสอบหลัง PM'], ['FM-CE.SE-006', 'ปก', 'done']]
@@ -93,6 +94,6 @@ export const GENERIC_FORMS = [['FM-CE.SE-005', 'เครื่องมือ�
 export const genericJob = (id, title, system, round, dates, status, touched) => ({ schema: 1, id, title, round, system, dates, status, touched, cur: 1, letter: false,
   forms: GENERIC_FORMS.map(([code, name]) => ({ code, name, kind: status === 'done' ? 'done' : 'todo' })), tools: [], folder: { photos: [], docs: [] } });
 export const listJobs = async () => [seedTx(),
-  genericJob('dm-cctv-3-69', 'DM CCTV 3/69', 'cctv', '3/69', ['2026-11-18', '2026-11-19'], 'todo', '2026-10-26T08:00:00Z'),
+  genericJob('dm-cctv-1-70', 'DM CCTV 1/70', 'cctv', '1/70', ['2026-11-18', '2026-11-19'], 'todo', '2026-10-26T08:00:00Z'),
   genericJob('dm-vccs-2-69', 'DM VCCS (หอฯ ด้านทิศใต้) 2/69', 'vccs', '2/69', ['2026-08-10', '2026-08-12'], 'done', '2026-08-12T09:00:00Z')];
 export const getCatalog = async () => catalog;
