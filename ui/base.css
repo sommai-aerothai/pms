@@ -333,3 +333,8 @@ td.pd input{border-style:dashed}
 .wrapr{flex-wrap:wrap}.wrapr .acts2{flex-basis:100%;justify-content:flex-start}
 .dv .grp{margin:var(--u-6) 0 0}
 .dv summary{cursor:pointer}
+.dots{display:inline-flex;align-items:center;gap:var(--u-6)}
+.dots .d{width:var(--u-10);height:var(--u-10);border-radius:var(--radius-round);border:var(--hair) solid var(--ctrl-border);background:var(--card)}
+.dots .d.dn{background:var(--accent);border-color:var(--accent)}
+.dots .d.cur{width:var(--u-14);height:var(--u-14);border:var(--u-3) solid var(--accent)}
+.lnk{color:var(--accent-text);font-weight:600}

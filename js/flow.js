@@ -5,6 +5,8 @@ import { ORDER } from './data/schedule-2569.js';
 
 export const STAGES = [['plan', 'แผน', 'งานโผล่จากตาราง PM · เปิดงาน'], ['notice', 'แจ้งซ่อม', 'นำเข้า FM-040 ที่อนุมัติ (QP 6.6)'], ['prep', 'เตรียม', 'เครื่องมือ FM-005 · WI/ฟอร์ม Rev ล่าสุด (QP 6.7)'],
   ['site', 'หน้างาน', 'ทำตาม WI ทีละอุปกรณ์ · ตรวจทรัพย์สิน · ทบทวนคู่มือ (QP 6.8)'], ['report', 'รายงาน', 'ออก FM-006 + แนบตามรายการ · ภายใน 20 วันทำการ (QP 6.9)'], ['send', 'ส่ง', 'ส่งผ่านสารบรรณ · ผู้ตรวจรับ (QP 6.9, 6.12)']];
+// 3 ขั้นที่ผู้ใช้เห็น (คำสั่งเจ้าของ 28 ต.ค. ดึก): เตรียม → หน้างาน → ส่งรายงาน · ขั้นละเอียดตาม QP-01 (STAGES) อยู่ข้างใน
+export const PHASES = [['prep', 'เตรียม', 'แผน · แจ้งซ่อม FM-040 · เครื่องมือ FM-005 · WI/ฟอร์ม Rev ล่าสุด (QP 6.1–6.7)'], ['site', 'หน้างาน', 'ทำตาม WI ทีละอุปกรณ์ · ตรวจทรัพย์สิน · ทบทวนคู่มือ As-Built (QP 6.8)'], ['report', 'ส่งรายงาน', 'สร้าง FM-006 + แนบตามรายการ · ส่งผ่านสารบรรณ · รอผู้ตรวจรับ (QP 6.9, 6.12)']];
 const MO = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 export const ymLabel = ym => { const [y, m] = ym.split('-').map(Number); return `${MO[m - 1]} ${String(y + 543).slice(2)}`; };
 export const addMonth = (ym, n) => { const [y, m] = ym.split('-').map(Number), t = y * 12 + m - 1 + n; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, '0')}`; };
@@ -31,7 +33,7 @@ export const matchRow = (rows, subject, norm, roundOf) => {
 
 // ---------- สร้างงานจากแถวตาราง (หรืองานนอกตาราง) ----------
 const V = (v, src, loc, at, x = {}) => ({ v, src, loc, at, ...x });
-export function newPmJob({ id, row, off, system, eng, travel, draft, prev = {}, now }) {
+export function newPmJob({ id, row, off, system, eng, travel, draft, prev = {}, now, me = '' }) {
   const base = row ? row.job : off.name, round = row ? row.round : off.round, fy = ORDER.fy, at = now.slice(0, 10);
   const vals = {};
   const R = `${ORDER.src}${row ? ' · แถว ' + row.id.slice(-2) : ''}`;
@@ -44,8 +46,8 @@ export function newPmJob({ id, row, off, system, eng, travel, draft, prev = {}, 
   if (eng) vals.eng = V(eng, prev.eng && prev.eng.includes(eng) ? 'prev' : 'manual', prev.eng && prev.eng.includes(eng) ? 'วิศวกรเฝ้าระวังรอบก่อน' : 'กรอกเอง', at);
   if (travel) vals.travel = V(travel, prev.travel === travel ? 'prev' : 'manual', prev.travel === travel ? 'จำต่อสถานี' : 'กรอกเอง', at);
   const title = row ? rowTitle(row) : `${off.name} ${off.round}/${String(fy).slice(2)}`;
-  return { schema: 2, id, title, round: `${round}/${String(fy).slice(2)}`, system: system || '', site: row ? row.site : 'อื่น ๆ', dates: off ? [off.start, addDays(off.start, off.days - 1)] : null, status: 'doing', touched: now,
-    pm: { base, fy, ym: row ? row.ym : '', days: row ? row.days : off.days, people: row ? [...row.people] : [], sched: row ? row.id : '', off: !row, order: row ? ORDER.no : '' },
+  return { schema: 2, owner: me, id, title, round: `${round}/${String(fy).slice(2)}`, system: system || '', site: row ? row.site : 'อื่น ๆ', dates: off ? [off.start, addDays(off.start, off.days - 1)] : null, status: 'doing', touched: now,
+    pm: { base, fy, ym: row ? row.ym : '', days: row ? row.days : off.days, people: row ? [...row.people] : me ? [me] : [], sched: row ? row.id : '', off: !row, order: row ? ORDER.no : '' },
     f040: 'wait', draft: !!draft, eng: eng || '', travel: travel || '', vals, forms: formsFor(base), tools: (prev.tools || []).map(t => ({ ...t, photo: '' })), ready: {}, auto: true, files: [], cur: 1, letter: !!row };
 }
 // ให้งานเก่า/งานจาก backend (โครงเดิม) มีค่าตั้งต้นครบ — ไม่ทับค่าที่มี
@@ -79,6 +81,7 @@ export function formProg(j, f) {
     return { done: filled - pend, total, filled, pend, text: `เติมจากไฟล์ ${j.fileFilled || 0}/${total} · เหลือกรอกเอง ${total - filled}`, sub: pend ? `รอยืนยัน ${pend} ช่อง` : '' };
   }
   if (f.kind === 'asset' && (j.assetCheck || []).length) { const n = j.assetCheck.length, k = assetOk(j); return { done: k, total: n, text: k === n ? 'ตรงทะเบียนครบ' : `ตรวจแล้ว ${k}/${n} รายการ`, sub: '' }; }
+  if (f.pend) return { done: 0, total: 1, pend: f.pend, text: `อ่านจากไฟล์ ${f.pend} ค่า · รอยืนยัน`, sub: f.fileName ? `ไฟล์ ${f.fileName}` : '' };
   return { done: f.done ? 1 : 0, total: 1, text: f.done ? 'ทำแล้ว' : 'ยังไม่ได้ทำ', sub: f.fileName ? `ไฟล์แนบ · ${f.fileName}` : '' };
 }
 export const formOk = (j, f) => { const p = formProg(j, f); return p.total > 0 && p.done === p.total; };
@@ -99,7 +102,11 @@ export function prepChecks(j, ctx) {
   ];
 }
 export const prepOk = (j, ctx) => prepChecks(j, ctx).every(c => c.auto);
-export const stageOf = (j, ctx) => j.status === 'done' ? 5 : j.f040 !== 'approved' ? 1 : !prepOk(j, ctx) ? 2 : j.forms.every(f => formOk(j, f)) ? 4 : 3;
+export const stageOf = (j, ctx) => j.status === 'done' || j.status === 'submitted' ? 5 : j.f040 !== 'approved' ? 1 : !prepOk(j, ctx) ? 2 : j.forms.every(f => formOk(j, f)) ? 4 : 3;
+export const phaseOf = (j, ctx) => { if (j.status === 'done' || j.status === 'submitted') return 2; const s = stageOf(j, ctx); return s <= 2 ? 0 : s === 3 ? 1 : 2; };
+export const mine = (j, me) => (j.pm && j.pm.people || []).includes(me) || j.owner === me;
+// เลยกำหนดส่ง (20 วันทำการหลังกลับ) กี่วัน · 0 = ยังไม่เลย/ไม่รู้วัน
+export const overdue = (j, today) => { if (j.status !== 'doing' || !j.dates) return 0; const d = deadline(j, today); return d.left < 0 ? -d.left : 0; };
 export const isReady = (j, ctx) => stageOf(j, ctx) === 4;
 // ตัวขัดขวางตัวแรก → { text, cap, spot } · spot ใช้เลื่อนไปที่จุดนั้นบนหน้างาน
 export function blocker(j, ctx) {
@@ -111,7 +118,7 @@ export function blocker(j, ctx) {
 }
 // CTA "สร้างรายงาน" ไม่พร้อม → ไปฟอร์มแรกที่ยังไม่เสร็จ (ไม่มีฟอร์มค้าง = ข้อค้างของ 040/เตรียม)
 export const firstGap = (j, ctx) => { const f = j.forms.find(x => !formOk(j, x)); return f ? 'form:' + (f.code || 'review') : blocker(j, ctx).spot; };
-export const rowReason = (j, ctx) => { const s = stageOf(j, ctx); return `${STAGES[s][1]} · ${s === 4 ? 'พร้อมสร้างรายงาน' : blocker(j, ctx).text}`; };
+export const rowReason = (j, ctx) => { if (j.status === 'submitted') return 'ส่งรายงานแล้ว · รอผู้ตรวจรับ'; const s = stageOf(j, ctx); return `${PHASES[phaseOf(j, ctx)][1]} · ${s === 4 ? 'พร้อมสร้างรายงาน' : blocker(j, ctx).text}`; };
 
 // ---------- ไฟล์แนบ: ผลของแต่ละไฟล์ ----------
 export const FM_RE = /FM[-\s_.]*(?:CE\.?\s*SE)?[-\s_.]*0*(\d{2,3})/i;

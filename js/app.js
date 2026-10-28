@@ -46,7 +46,7 @@ function ensureDraft(id) {
   const row = id === 'off' ? null : S.sched.find(r => r.id === id); if (id !== 'off' && !row) { S.draft = null; return; }
   const off = row ? null : { name: '', round: F.fiscal(S.today).round, start: S.today, days: 1, reason: '' }, key = row ? row.job : 'off', prev = store.prevRound(key, row ? row.site : '');
   S.prev = prev;
-  S.draft = { id, row, off, other: false, useImp: false, job: F.newPmJob({ id: row ? row.id : 'off-' + Date.now().toString(36), row, off: off && { ...off, name: 'งานนอกตาราง' }, system: row ? F.sysFor(row.job, S.catalog.systems) : '', eng: '', travel: prev.travel, draft: false, prev, now: nowIso() }) };
+  S.draft = { id, row, off, other: false, useImp: false, job: F.newPmJob({ id: row ? row.id : 'off-' + Date.now().toString(36), row, off: off && { ...off, name: 'งานนอกตาราง' }, system: row ? F.sysFor(row.job, S.catalog.systems) : '', eng: '', travel: prev.travel, draft: false, prev, now: nowIso(), me: S.user.name }) };
 }
 function resolve() {
   let p = parts();
@@ -189,7 +189,7 @@ function nx(d) {
 // ยืนยันค่าที่เติมจากไฟล์ทั้งฟอร์ม (ล้างป้าย "รอยืนยัน")
 function confirmForm(code) {
   const j = S.job, f = j.forms.find(x => (x.code || 'review') === code); if (!f) return;
-  let n = 0; if (f.kind === 'tx') (j.tx || []).forEach(t => { n += Object.keys(t.pend || {}).filter(k => j.fields.some(x => x.k === k)).length; t.pend = {}; });
+  let n = f.pend || 0; if (f.kind !== 'tx') { f.pend = 0; f.done = true; } if (f.kind === 'tx') (j.tx || []).forEach(t => { n += Object.keys(t.pend || {}).filter(k => j.fields.some(x => x.k === k)).length; t.pend = {}; });
   save(); S.rev++; draw(); toast(`ยืนยันแล้ว ${n} ช่อง`, 'ok');
 }
 
@@ -221,16 +221,15 @@ async function removePhoto(key) {
 }
 // การ์ด "ไฟล์แนบและรูป": แนบได้ทุกไฟล์ยกเว้นวิดีโอ → เก็บ → อ่านในเครื่อง → เติมการ์ด 3 (ถ้าสวิตช์เปิด) → แสดงผลทีละไฟล์
 async function attachFiles(list) {
-  const j = S.job; let filled = 0, n = 0;
+  const j = S.job; let filled = 0, n = 0; j.files ||= [];
   for (const f of list) {
     const r = await files.inspect(f, j, ctx()), e = { name: f.name || 'รูป', type: f.type, size: f.size, at: nowIso(), state: r.state, target: r.target, text: r.text, id: '' };
     if (r.state === 'rejected') { j.files.push(e); continue; }
     let blob = f; try { if (/^image\//.test(f.type)) blob = await shrink(f); } catch { /* รูปย่อไม่ได้ = เก็บไฟล์เดิม */ }
     try { e.id = await photos.put(blob); } catch { toast('เก็บไฟล์ไม่ได้ (พื้นที่เต็มหรือถูกปิดไว้)', 'warn'); continue; }
-    if (r.state === 'filled') {
-      if (j.auto !== false) { const k = files.apply202(j, r.read); filled += k; e.text = `เติม ${k} ช่องใน ${r.target} · ${r.read.rows.length} เครื่อง · รอยืนยัน${r.warnRev ? r.text.slice(r.text.indexOf(' · ไฟล์')) : ''}`; e.state = r.warnRev ? 'warn' : 'filled'; }
-      else { e.state = 'attached'; e.text = `จัดเข้า ${r.target} · สวิตช์เติมอัตโนมัติปิดอยู่ · ไม่ได้เติมค่า`; }
-    }
+    if (r.state === 'filled') { const k = files.apply202(j, r.read); filled += k; e.text = `เติม ${k} ช่องใน ${r.target} · ${r.read.rows.length} เครื่อง · รอยืนยัน${r.warnRev ? r.text.slice(r.text.indexOf(' · ไฟล์')) : ''}`; e.state = r.warnRev ? 'warn' : 'filled'; }
+    else if (r.nvals) { const fm = j.forms.find(x => x.code === r.target && x.kind !== 'tx'); if (fm) { fm.pend = (fm.pend || 0) + r.nvals; fm.fileName = e.name; filled += r.nvals; e.text += ' · รอยืนยัน'; } }
+    else if (r.state === 'unsorted' && /^image\//.test(f.type)) { e.state = 'attached'; e.text = 'ลายมือ · พิมพ์ค่าเองในฟอร์ม (รูปอยู่ข้างช่อง)'; }   // อ่านไม่ได้ = เก็บเป็นหลักฐาน ไม่ใช้ AI cloud
     j.files.push(e); n++; try { S.ph[e.id] = URL.createObjectURL(blob); } catch { /* ไม่มีรูปย่อ */ }
   }
   if (!save()) return; S.rev++; draw();
@@ -244,7 +243,7 @@ async function attachFiles(list) {
 // ---------- เปิดงาน ----------
 async function createFromDraft(asDraft) {
   const d = S.draft; if (!d) return; const now = nowIso();
-  let j = d.off ? F.newPmJob({ id: d.job.id, off: d.off, system: '', eng: d.job.eng, travel: d.job.travel, draft: asDraft, prev: S.prev, now }) : { ...d.job, draft: asDraft, touched: now };
+  let j = d.off ? F.newPmJob({ id: d.job.id, off: d.off, system: '', eng: d.job.eng, travel: d.job.travel, draft: asDraft, prev: S.prev, now, me: S.user.name }) : { ...d.job, draft: asDraft, touched: now };
   if (!asDraft && !d.off && openNeeds().length) return spotNeed();
   if (d.off && (!d.off.name.trim() || !d.off.reason.trim() || !(d.off.days >= 1))) return spotNeed();
   const I = S.imp, use = I && (d.useImp || (d.row && F.matchRow([d.row], I.data.subject, imp.norm, imp.roundOf)));
@@ -311,12 +310,13 @@ function ctaGo() {
 
 // ---------- เหตุการณ์ ----------
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-spot],[data-vo],[data-sopen],[data-sx],[data-more],[data-site],[data-eng],[data-eng-other],[data-travel],[data-offrd],[data-use-imp],[data-open-draft],[data-sim040],[data-chk],[data-confirm-form],[data-form-done],[data-assign],[data-file-del],[data-val-edit],[data-val-save],[data-val-ok],[data-evt],#cta,[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],[data-impjob],[data-imp-save],[data-bm-link],[data-bm-copy],#bd');
+  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-spot],[data-vo],[data-ex],[data-sopen],[data-sx],[data-more],[data-site],[data-eng],[data-eng-other],[data-travel],[data-offrd],[data-use-imp],[data-open-draft],[data-sim040],[data-chk],[data-confirm-form],[data-form-done],[data-assign],[data-file-del],[data-val-edit],[data-val-save],[data-val-ok],[data-evt],#cta,[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],[data-impjob],[data-imp-save],[data-bm-link],[data-bm-copy],#bd');
   if (!t) return; const d = t.dataset;
   if (d.pre) { const [k, v] = d.pre.split(':'); S.ui[k] = v; S.rev++; }
   if ('vo' in d) { S.ui.vo = !t.parentNode.open; return; }
   if (d.spot) S.ui.spot = d.spot;   // แตะแคปซูลในหน้าวันนี้ → ไปหน้างานแล้วเลื่อนไปจุดที่ติด
   if (t.id === 'cta') ctaGo();
+  else if ('ex' in d) { S.job.example = d.ex; save(); closeSheet(); S.rev++; draw(); toast('เปลี่ยนตัวอย่างแล้ว', 'ok'); }
   else if ('sopen' in d) { const n = t.closest('.nav'); n.classList.add('so'); $('input', n).focus(); }
   else if ('sx' in d) { const n = t.closest('.nav'), i = $('input', n); n.classList.remove('so'); if (i.value) { i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); } }
   else if ('more' in d) { $$('[data-x]', t.closest('.grp')).forEach(x => x.removeAttribute('hidden')); t.remove(); }
@@ -347,7 +347,7 @@ document.addEventListener('click', e => {
   else if (t.id === 'bd' || 'close' in d) closeSheet();
   else if (t.classList.contains('sw')) {
     const on = t.getAttribute('aria-checked') !== 'true'; t.setAttribute('aria-checked', on); $('span', t).textContent = on ? 'เปิด' : 'ปิด';
-    if (d.off) { store.setOffline(d.off, on); S.rev++; draw(); } else if (d.pref) store.pref(d.pref, on); else if ('auto' in d) { S.job.auto = on; save(); }
+    if (d.off) { store.setOffline(d.off, on); S.rev++; draw(); } else if (d.pref) store.pref(d.pref, on); 
   }
   else if (d.offAct) { closeSheet(); const on = !V.isOff(S, d.offAct); store.setOffline(d.offAct, on); S.rev++; draw(); toast(on ? 'เก็บไว้ดู offline แล้ว' : 'ลบออกจาก offline แล้ว', on ? 'dl' : 'trash'); }
   else if (d.pane) { $$('button', t.parentNode).forEach(b => b.setAttribute('aria-pressed', b === t)); $$(':scope > .pane', $('#' + d.pane).parentNode).forEach(p => { p.hidden = p.id !== d.pane; }); if (/^[pr]-/.test(d.pane)) S.ui[d.pane[0]] = d.pane; if (/^pm-/.test(d.pane)) { S.ui.pmt = d.pane; drawCta(); } }

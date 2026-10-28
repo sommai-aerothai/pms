@@ -52,10 +52,10 @@ export const recent = S => S.jobs.filter(j => j.status !== 'done').sort((a, b) =
 const when = (S, j) => { if (!j.dates) return j.pm.ym ? F.ymLabel(j.pm.ym) : 'ยังไม่กำหนดวัน'; const [a, b] = j.dates, d = F.daysUntil(a, S.today); return d === 1 ? 'พรุ่งนี้' : d === 0 ? 'วันนี้' : d < 0 && F.daysUntil(b, S.today) >= 0 ? 'กำลังปฏิบัติงาน' : d < 0 ? 'เลยกำหนดวันงาน' : dShort(a); };
 const tRow = (when_, title, kind, text, href, cap, spot = '') => `<div class="row tr"><span class="rt"><span class="cap">${esc(when_)}</span><b>${esc(title)}</b>${st(kind, text)}</span><a class="btn sm" href="${href}"${spot ? ` data-spot="${esc(spot)}"` : ''}>${esc(cap)}</a></div>`;
 export function today(S) {
-  const cx = ctxOf(S), jobs = S.jobs.filter(j => j.status !== 'done').sort((a, b) => (a.dates ? a.dates[0] : '9').localeCompare(b.dates ? b.dates[0] : '9'));
+  const cx = ctxOf(S), jobs = S.jobs.filter(j => F.mine(j, S.user.name) && j.status === 'doing').sort((a, b) => (a.dates ? a.dates[0] : '9').localeCompare(b.dates ? b.dates[0] : '9'));
   const opened = new Set(S.jobs.map(j => j.pm && j.pm.sched)), m0 = S.today.slice(0, 7);
   const mineRows = F.scheduleGroups(S.sched, [...opened], S.today, S.user.name)[0][2].filter(r => r.people.includes(S.user.name));
-  const rows = jobs.map(j => { const b = F.blocker(j, cx), ok = b.spot === 'cta'; return tRow(when(S, j), j.title, ok ? 'ok' : 'warn', b.text, `#/pm/${j.id}`, b.cap, b.spot); })
+  const rows = jobs.map(j => { const b = F.blocker(j, cx), ok = b.spot === 'cta', od = F.overdue(j, S.today); return tRow(od ? `⚠︎ เลยกำหนด ${od} วัน` : when(S, j), j.title, ok ? 'ok' : 'warn', b.text, `#/pm/${j.id}`, b.cap, b.spot); })
     .concat(mineRows.map(r => tRow(F.ymLabel(r.ym), F.rowTitle(r), 'todo', 'ยังไม่ได้เปิดงาน', `#/pm/new/${r.id}`, 'เปิดงาน')));
   const wd = DAYS[new Date(S.today + 'T00:00:00Z').getUTCDay()];
   return `${nav('วันนี้')}<div class="in today"><h1 class="lt">วันนี้</h1>
@@ -137,25 +137,29 @@ export function view(S, id, back) {
 const SITE = { DM: 'DM ดอนเมือง', SB: 'SB สุวรรณภูมิ', MK: 'MK ทุ่งมหาเมฆ', 'สถานี': 'สถานี (RCAG · หอฯ)' };
 const schedRow = (r, extra = '', base = '#/pm/new') => `<a class="row" href="${base}/${r.id}"><span class="rt"><span>${esc(F.rowTitle(r))}</span><span class="sub">${[extra, r.rotate ? F.rowDur(r) : `ครั้งที่ ${r.round}/${String(ORDER.fy).slice(2)} · ${F.rowDur(r)}`, r.people.join(', ')].filter(Boolean).join(' · ')}</span><span class="src">${ic('web')}เว็บกอง</span></span>${chev}</a>`;
 const jobRow = (j, S) => { const cx = ctxOf(S), p = F.jobProg(j), s = F.stageOf(j, cx);
-  return `<a class="row" href="#/pm/${j.id}"${S.ui.added === j.id ? ' data-new' : ''}>${ring(j.status === 'done' ? 1 : p.frac, `ความคืบหน้าฟอร์ม ${F.formsDone(j)}/${j.forms.length}`)}<span class="rt"><span>${esc(j.title)}</span><span class="sub">${j.dates ? dRange(j.dates) : j.pm.ym ? F.ymLabel(j.pm.ym) : ''}</span><span class="sub rsn">${esc(F.rowReason(j, cx))}</span></span>${chev}</a>`; };
+  return `<a class="row" href="#/pm/${j.id}"${S.ui.added === j.id ? ' data-new' : ''}>${ring(j.status === 'done' ? 1 : p.frac, `ความคืบหน้าฟอร์ม ${F.formsDone(j)}/${j.forms.length}`)}<span class="rt"><span>${esc(j.title)}</span><span class="sub">${j.dates ? dRange(j.dates) : j.pm.ym ? F.ymLabel(j.pm.ym) : ''}</span>${F.overdue(j, S.today) ? st('warn', `เลยกำหนด ${F.overdue(j, S.today)} วัน`) : ''}<span class="sub rsn">${esc(F.rowReason(j, cx))}</span></span>${chev}</a>`; };
 const SCH_SHOW = 3;
 export function pm(S) {
-  const cx = ctxOf(S), top = S.ui.pmt || 'pm-cur', seg = (id, t) => `<button data-pane="${id}" aria-pressed="${top === id}">${t}</button>`;
-  const open = S.jobs.filter(j => j.status !== 'done').sort((a, b) => b.touched.localeCompare(a.touched)), gs = F.scheduleGroups(S.sched, S.jobs.map(j => j.pm && j.pm.sched), S.today, S.user.name).slice(0, 2).filter(g => g[2].length);
-  const more = g => g.length > SCH_SHOW ? `<button class="row more" data-more>${ic('plus', 'lead')}<span class="rt"><span>ดูทั้งหมด ${g.length} งาน</span></span></button>` : '';
-  const cur = `${open.length ? `<div class="sh">เปิดงานแล้ว</div><div class="grp">${open.map(j => jobRow(j, S)).join('')}</div>` : ''}
- ${gs.map(([t, ym, L]) => `<div class="sh">${t} · ${F.ymLabel(ym)}</div><div class="grp">${L.map((r, i) => i < SCH_SHOW ? schedRow(r) : schedRow(r).replace('<a ', '<a data-x hidden ')).join('')}${more(L)}</div>`).join('')}
- ${!open.length && !gs.length ? '<div class="empty">ยังไม่มีงานเดือนนี้หรือเดือนหน้า · กด "+ งาน PM" เพื่อเลือกจากตารางทั้งปี</div>' : ''}`;
-  const past = S.docs.filter(d => isMine(S, d)).sort((a, b) => b.modified.localeCompare(a.modified));
+  const cx = ctxOf(S), me = S.user.name, top = S.ui.pmt || 'pm-cur', seg = (id, t) => `<button data-pane="${id}" aria-pressed="${top === id}">${t}</button>`;
+  const my = S.jobs.filter(j => F.mine(j, me)), od = j => F.overdue(j, S.today), start = j => j.dates ? j.dates[0] : '9';
+  const todo = my.filter(j => j.status === 'doing').sort((a, b) => od(b) - od(a) || start(a).localeCompare(start(b)));
+  const wait = [...my.filter(j => j.status === 'submitted').map(j => jobRow(j, S)), ...S.docs.filter(d => isMine(S, d) && d.status !== 'accepted').map(d => docRow(S, d, '#/pm'))];
+  const next = F.scheduleGroups(S.sched, S.jobs.map(j => j.pm && j.pm.sched), S.today, me).slice(0, 2).flatMap(g => g[2].filter(r => r.people.includes(me)));
+  const more = n => n > SCH_SHOW ? `<button class="row more" data-more>${ic('plus', 'lead')}<span class="rt"><span>ดูทั้งหมด ${n} งาน</span></span></button>` : '';
+  const grp = (t, rows) => rows.length ? `<div class="sh">${t}</div><div class="grp">${rows.join('')}</div>` : '';
+  const cur = `${grp('ต้องทำ', todo.map(j => jobRow(j, S)))}${grp('รอผู้ตรวจ', wait)}
+ ${next.length ? `<div class="sh">ถัดไป</div><div class="grp">${next.map((r, i) => i < SCH_SHOW ? schedRow(r, F.ymLabel(r.ym)) : schedRow(r, F.ymLabel(r.ym)).replace('<a ', '<a data-x hidden ')).join('')}${more(next.length)}</div>` : ''}
+ ${!todo.length && !wait.length && !next.length ? '<div class="empty">ไม่มีงานค้าง · งานตามตารางของคุณที่ถึงรอบจะขึ้นที่นี่ · กด "+ งาน PM" เพื่อเลือกเอง</div>' : ''}`;
+  const past = [...S.docs.filter(d => isMine(S, d) && d.status === 'accepted').map(d => [d.modified, docRow(S, d, '#/pm')]), ...my.filter(j => j.status === 'done').map(j => [j.touched, jobRow(j, S)])].sort((a, b) => b[0].localeCompare(a[0]));
   return `${nav('งาน PM', null, '', 'ค้นหางาน')}<div class="in">${ptr}<h1 class="lt">งาน PM</h1><div class="seg" role="group" aria-label="มุมมอง">${seg('pm-cur', 'ปัจจุบัน')}${seg('pm-past', 'ย้อนหลัง')}</div>
  <div class="pane" id="pm-cur" ${top === 'pm-cur' ? '' : 'hidden'}>${cur}</div>
- <div class="pane" id="pm-past" ${top === 'pm-past' ? '' : 'hidden'}><p class="sec note">รายงาน PM ที่ฉันเป็นผู้ปฏิบัติ</p>${past.length ? `<div class="grp">${roundsList(S, past, '#/pm')}</div>` : '<div class="empty">ยังไม่มีรายงานของคุณ</div>'}</div></div>`;
+ <div class="pane" id="pm-past" ${top === 'pm-past' ? '' : 'hidden'}><p class="sec note">งานของฉันที่ผู้ตรวจรับแล้ว · ใช้เป็นตัวอย่างในงานถัดไปได้</p>${past.length ? `<div class="grp">${past.map(x => x[1]).join('')}</div>` : '<div class="empty">ยังไม่มีงานที่ผู้ตรวจรับแล้ว</div>'}</div></div>`;
 }
 // เลือกงานจากตาราง (ทั้งปี) · กรองตามศูนย์ · งานนอกตาราง
 export function pick(S, _, back) {
   const site = S.ui.site || '', seg = (v, t) => `<button data-site="${v}" aria-pressed="${site === v}">${t}</button>`;
-  const gs = F.scheduleGroups(S.sched.filter(r => !site || r.site === site), S.jobs.map(j => j.pm && j.pm.sched), S.today, S.user.name);
-  return `${nav('เลือกงาน', back, '', 'ค้นหางานในตาราง')}<div class="in"><h1 class="lt">เลือกงาน</h1><p class="sec note">จากตาราง PM ปีงบ ${ORDER.fy} · ${ORDER.no} · เติมรายละเอียดให้ที่เหลือ</p>
+  const gs = F.scheduleGroups(S.sched.filter(r => r.people.includes(S.user.name) && (!site || r.site === site)), S.jobs.map(j => j.pm && j.pm.sched), S.today, S.user.name);
+  return `${nav('เลือกงาน', back, '', 'ค้นหางานในตาราง')}<div class="in"><h1 class="lt">เลือกงาน</h1><p class="sec note">เฉพาะงานที่คุณเป็นผู้ปฏิบัติ · ตาราง PM ปีงบ ${ORDER.fy} · ${ORDER.no}</p>
  <div class="seg scr" role="group" aria-label="ศูนย์">${seg('', 'ทั้งหมด')}${['DM', 'SB', 'MK', 'สถานี'].map(x => seg(x, x)).join('')}</div>
  ${gs.map(([t, ym, L]) => L.length ? `<div class="sh">${t}${ym ? ' · ' + F.ymLabel(ym) : ''} · ${L.length} งาน</div><div class="grp">${L.map(r => schedRow(r, t === 'ทั้งปี' ? F.ymLabel(r.ym) : '', '#/pm/pick')).join('')}</div>` : '').join('')}
  <div class="grp"><a class="row" href="#/pm/pick/off">${ic('plus', 'lead')}<span class="rt"><span>งานนอกตาราง</span><span class="sub">กรอกเอง · ต้องระบุเหตุผล</span></span>${chev}</a></div></div>`;
@@ -212,34 +216,60 @@ export const openNeeds = S => { const d = S.draft, j = d.job; return [[j.eng, 'e
 
 // ---------- หน้างาน: ขั้นปัจจุบัน + 3 การ์ด ----------
 const FILE_ST = { filled: ['ok', 'done'], attached: ['app', 'doc'], unsorted: ['todo', 'circle'], warn: ['warn', 'warn'], rejected: ['warn', 'warn'], error: ['warn', 'warn'] };
-const stageBar = (j, s) => `<button class="stg" data-sheet="stages" aria-label="ดูทั้ง 6 ขั้น"><span class="stn"><i class="dot"></i><b>${F.STAGES[s][1]}</b></span><span class="sa">${ic('chev')}</span><span class="sec">${F.STAGES[s + 1] ? F.STAGES[s + 1][1] : 'จบงาน'}</span><span class="sinfo">${ic('info')}</span></button>`;
+const exampleOf = (S, j) => S.docs.find(d => d.id === j.example) || S.docs.filter(d => isMine(S, d) && d.status === 'accepted' && d.system === j.system).sort((a, b) => b.modified.localeCompare(a.modified))[0] || S.docs.find(d => d.system === j.system) || null;
+const stageBar = (j, p) => `<button class="stg" data-sheet="stages" aria-label="ขั้น ${F.PHASES[p][1]} · ดูทั้ง 3 ขั้น"><span class="dots">${F.PHASES.map((_, i) => `<i class="d${i < p ? ' dn' : i === p ? ' cur' : ''}"></i>`).join('')}</span><b>${F.PHASES[p][1]}</b><span class="sa">${ic('chev')}</span><span class="sec">${F.PHASES[p + 1] ? F.PHASES[p + 1][1] : 'จบงาน'}</span><span class="sinfo">${ic('info')}</span></button>`;
 const f040Row = (S, j) => j.f040 === 'approved'
   ? `<div class="row" data-spot-id="f040"><span class="rt"><span class="cap">FM-CE.SE-040 ใบแจ้งซ่อม</span>${st('ok', 'อนุมัติแล้ว')}${j.vals.f040 ? `<span class="tags">${srcTag(j.vals.f040)}</span>` : ''}</span></div>`
   : `<div class="row wrapr" data-spot-id="f040"><span class="rt"><span class="cap">FM-CE.SE-040 ใบแจ้งซ่อม</span>${st('warn', 'รอ FM-040 ที่อนุมัติ')}<span class="sub">${j.draft ? 'เปิดเป็นร่าง · ' : ''}ต้องมีก่อนไปขั้นเตรียม</span></span><span class="acts2"><a class="btn sm" href="#/import">นำเข้า</a>${store.backendName() === 'demo' ? `<button class="btn sm alt" data-sim040>จำลอง: อนุมัติ</button>` : ''}</span></div>`;
-const prepSec = (S, j) => `<div class="sh2" data-spot-id="prep">ความพร้อมก่อนออกสถานี (QP 6.7)</div>${F.prepChecks(j, ctxOf(S)).map(c => c.auto ? `<div class="row">${st('ok', c.label)}</div>`
+const prepRows = (S, j, onlyBad) => F.prepChecks(j, ctxOf(S)).filter(c => !onlyBad || !c.auto).map(c => c.auto ? `<div class="row">${st('ok', c.label)}${c.note ? `<span class="sub">${esc(c.note)}</span>` : ''}</div>`
   : c.manual ? `<button class="row" data-chk="${c.id}"><span class="rt"><span>${esc(c.label)}</span>${st('todo', 'ยังไม่ได้ทำ · แตะเมื่อทำแล้ว')}${c.note ? `<span class="sub">${esc(c.note)}</span>` : ''}</span></button>`
-  : `<a class="row" href="#/pm/${j.id}/${c.go || ''}"><span class="rt"><span>${esc(c.label)}</span>${st('warn', c.note || 'ยังไม่ผ่าน')}</span>${chev}</a>`).join('')}`;
-const attachOk = (j, id, cx) => ({ result: j.forms.filter(f => !['FM-CE.SE-041', 'FM-CE.SE-001', 'FM-CE.SE-039', ''].includes(f.code)).every(f => F.formOk(j, f)), '001': F.formOk(j, j.forms.find(f => f.code === 'FM-CE.SE-001') || {}), '005': !!j.ready.f005, '040': j.f040 === 'approved', '041': F.formOk(j, j.forms.find(f => f.code === 'FM-CE.SE-041') || {}) })[id];
-const reportSec = (S, j) => { const dl = F.deadline(j, S.today);
-  return `<div class="sh2">ส่งรายงาน (QP 6.9)</div><div class="row"><span class="rt"><span class="cap">กำหนดส่ง</span><b>ส่งภายใน 20 วันทำการ${dl ? ` · เหลือ ${Math.max(0, dl.left)} วัน` : ''}</b><span class="sub">${dl ? (dl.left < 0 ? `เลยกำหนด ${-dl.left} วัน · ` : '') + `ครบกำหนด ${dFull(dl.due)} · นับจากวันกลับจากหน้างาน` : 'เริ่มนับจากวันกลับจากหน้างาน · รอวันที่จาก FM-040'}</span></span></div>
- <div class="sh2">รายการแนบรายงาน (QP 6.9)</div>${ATTACH_69.map(a => a.opt ? `<div class="row">${st('todo', `${a.code ? a.code + ' ' : ''}${a.name} · ไม่บังคับ (${a.opt})`)}</div>` : `<div class="row">${st(attachOk(j, a.id) ? 'ok' : 'todo', `${a.code ? a.code + ' ' : ''}${a.name} · ${attachOk(j, a.id) ? 'พร้อม' : 'ยังไม่พร้อม'}`)}</div>`).join('')}`; };
-const fileRows = (S, j) => (j.files || []).map((f, i) => { const [k, icn] = FILE_ST[f.state] || FILE_ST.unsorted, u = S.ph[f.id], img = u && /^image\//.test(f.type);
-  return `<button class="row" data-sheet="file:${i}"><span class="tn ${img ? '' : 'no'}">${img ? `<img src="${u}" alt="">` : ic(icn === 'done' ? 'doc' : 'doc')}</span><span class="rt"><span class="fn">${esc(f.name)}</span>${st(k, f.text)}${f.target ? `<span class="sub">${esc(f.target)}</span>` : ''}</span>${chev}</button>`; }).join('');
+  : `<a class="row" href="#/pm/${j.id}/${c.go || ''}"><span class="rt"><span>${esc(c.label)}</span>${st('warn', c.note || 'ยังไม่ผ่าน')}</span>${chev}</a>`).join('');
+const attachOk = (j, id) => ({ result: j.forms.filter(f => !['FM-CE.SE-041', 'FM-CE.SE-001', 'FM-CE.SE-039', ''].includes(f.code)).every(f => F.formOk(j, f)), '001': F.formOk(j, j.forms.find(f => f.code === 'FM-CE.SE-001') || {}), '005': !!j.ready.f005, '040': j.f040 === 'approved', '041': F.formOk(j, j.forms.find(f => f.code === 'FM-CE.SE-041') || {}) })[id];
+const FILE_ICON = { filled: 'done', attached: 'doc', unsorted: 'circle', warn: 'warn', rejected: 'warn', error: 'warn' };
+const fileRows = (S, j) => (j.files || []).map((f, i) => { const [k] = FILE_ST[f.state] || FILE_ST.unsorted, u = S.ph[f.id], img = u && /^image\//.test(f.type);
+  return `<button class="row" data-sheet="file:${i}"><span class="tn ${img ? '' : 'no'}">${img ? `<img src="${u}" alt="">` : ic('doc')}</span><span class="rt"><span class="fn">${esc(f.name)}</span>${st(k, f.text)}${f.target ? `<span class="sub">${esc(f.target)}</span>` : ''}</span>${chev}</button>`; }).join('');
+const goRow = (kind, text, sub, cap, attrs) => `<div class="row"><span class="rt"><span>${esc(text)}</span>${sub ? st(kind, sub) : ''}</span><a class="btn sm" ${attrs}>${esc(cap)}</a></div>`;
+// การ์ด "ต้องทำตอนนี้": เฉพาะสิ่งที่ต้องลงมือของขั้นนี้ · ว่าง = ✓ พร้อม…
+function todoCard(S, j, ph) {
+  const cx = ctxOf(S), it = [], V0 = j.vals || {}, dl = F.deadline(j, S.today), od = F.overdue(j, S.today);
+  const line = j.dates ? `${dRange(j.dates)} · กำหนดส่ง ${dFull(dl.due)}${dl.left >= 0 ? ` (เหลือ ${dl.left} วันทำการ)` : ''}` : 'ยังไม่มีวันปฏิบัติงานจริง · รอวันที่จาก FM-040';
+  if (j.status === 'submitted') it.push(`<div class="row">${st('app', 'ส่งรายงานแล้ว · รอผู้ตรวจรับ')}</div>`);
+  else {
+    if (j.f040 !== 'approved') it.push(f040Row(S, j));
+    else {
+      if (!j.dates) it.push(`<button class="row" data-sheet="val:j:dates"><span class="rt"><span>ระบุวันที่ปฏิบัติงาน</span>${st('warn', 'ยังไม่มีวันจริง')}</span>${chev}</button>`);
+      if (ph === 0) { const bad = prepRows(S, j, true); if (bad) it.push(`<div class="sh2" data-spot-id="prep">ความพร้อมก่อนออกสถานี (QP 6.7)</div>${bad}`); }
+    }
+    if (ph === 0 && V0.people && V0.people.pending) it.push(`<button class="row" data-sheet="val:j:people"><span class="rt"><span>ยืนยันรายชื่อผู้ปฏิบัติ</span>${st('warn', 'รอยืนยันชื่อ')}</span>${chev}</button>`);
+    for (const [k, l] of [['eng', 'วิศวกรเฝ้าระวัง'], ['travel', 'การเดินทาง']]) if (!j[k]) it.push(`<button class="row" data-sheet="val:j:${k}"><span class="rt"><span>ระบุ${l}</span>${st('warn', 'ยังไม่ระบุ')}</span>${chev}</button>`);
+    if (ph === 1) {
+      const left = j.forms.filter(f => !F.formOk(j, f)), first = left[0], pf = j.forms.find(f => (F.formProg(j, f).pend || 0) > 0), np = j.forms.reduce((n, f) => n + (F.formProg(j, f).pend || 0), 0);
+      if (first) it.push(goRow('todo', `ฟอร์มที่เหลือ ${left.length} จาก ${j.forms.length}`, `ถัดไป: ${first.name}`, 'ไปกรอก', `href="#/pm/${j.id}" data-spot="form:${first.code || 'review'}"`));
+      if (pf) it.push(goRow('warn', `ยืนยันค่าที่อ่านจากไฟล์ ${np} ช่อง`, 'รอยืนยัน', 'ไปยืนยัน', `href="#/pm/${j.id}" data-spot="form:${pf.code || 'review'}"`));
+    }
+    if (ph === 2) { const bad = ATTACH_69.filter(a => !a.opt && !attachOk(j, a.id)); if (bad.length) it.push(`<div class="sh2">ยังไม่พร้อมแนบรายงาน (QP 6.9)</div>${bad.map(a => `<div class="row">${st('todo', `${a.code ? a.code + ' ' : ''}${a.name}`)}</div>`).join('')}`); }
+  }
+  if (!it.length) it.push(`<div class="row">${st('ok', ph === 0 ? 'พร้อมเข้าขั้นหน้างาน' : ph === 1 ? 'พร้อมไปขั้นส่งรายงาน' : 'พร้อมสร้างรายงาน')}</div>`);
+  return `<div class="grp card"><div class="gh">ต้องทำตอนนี้<span class="sub">${esc(line)}</span>${od ? `<span class="st w mt1">${ic('warn')}เลยกำหนด ${od} วัน</span>` : ''}</div>${it.join('')}</div>`;
+}
 export function job(S, id, back) {
-  const j = S.jobs.find(x => x.id === id), cx = ctxOf(S), s = F.stageOf(j, cx), sc = 'j', pend = f => F.formProg(j, f).pend;
-  const rows = valueRows(j, 'job').map(r => vrow(r, sc)).join('');
+  const j = S.jobs.find(x => x.id === id), cx = ctxOf(S), ph = F.phaseOf(j, cx), pend = f => F.formProg(j, f).pend;
+  const ex = exampleOf(S, j), rows = valueRows(j, 'job').map(r => vrow(r, 'j')).join('');
   const forms = j.forms.map(f => { const p = F.formProg(j, f), code = f.code || 'review', href = f.kind === 'tx' && j.tx ? `#/pm/${j.id}/fill` : f.kind === 'asset' && (j.assetCheck || []).length ? `#/pm/${j.id}/asset` : '', frac = p.total ? p.done / p.total : 0,
     nf = (j.files || []).filter(x => x.target && x.target === f.code).length, body = `${ring(frac, p.total > 1 ? `ยืนยันแล้ว ${p.done} จาก ${p.total}` : p.done ? 'ทำแล้ว' : 'ยังไม่ได้ทำ')}<span class="rt"><span>${f.code ? f.code + ' ' : ''}${esc(f.name)}${f.wi ? ` <span class="wic">(${esc(f.wi)})</span>` : ''}</span><span class="sub">${esc(p.text)}${nf ? ` · ไฟล์แนบ ${nf}` : ''}</span>${p.sub ? `<span class="sub">${esc(p.sub)}</span>` : ''}${f.sub ? `<span class="sub">${esc(f.sub)}</span>` : ''}${f.warn ? `<span class="src w">${ic('warn')}${esc(f.warn)}</span>` : ''}</span>${chev}`;
     const row = href ? `<a class="row" href="${href}" data-spot-id="form:${code}">${body}</a>` : `<button class="row" data-sheet="manual:${code}" data-spot-id="form:${code}">${body}</button>`;
     return row + (p.pend ? `<div class="row cf"><span class="rt">${fileTag}</span><button class="btn sm alt" data-confirm-form="${esc(code)}">${ic('done')}ยืนยันทั้งหมดในฟอร์มนี้ · ${p.pend} ช่อง</button></div>` : ''); }).join('');
   const nPend = j.forms.reduce((n, f) => n + (pend(f) || 0), 0);
-  return `${nav(F.navTitle(j), back)}<div class="in pt2">${j.status === 'done' ? '' : stageBar(j, s)}
- <div class="grp card"><div class="gh">งาน</div>${rows}${f040Row(S, j)}${s === 2 ? prepSec(S, j) : ''}${s >= 4 ? reportSec(S, j) : ''}</div>
- <div class="grp card"><div class="gh">ไฟล์แนบและรูป<span class="sub">แนบได้ทุกไฟล์ยกเว้นวิดีโอ · อ่านในเครื่อง ไม่ส่งออกนอกเครื่อง</span></div>
- <div class="row sr"><span class="rt"><span>เติมฟอร์มจากไฟล์อัตโนมัติ</span><span class="sub">ค่าที่เติมจะมีป้าย "รอยืนยัน"</span></span>${sw(j.auto !== false, 'data-auto aria-label="เติมฟอร์มจากไฟล์อัตโนมัติ"')}</div>
+  const detail = `<div class="pad2"><details class="rel dv"${S.ui.vo ? ' open' : ''}><summary data-vo>${ic('doc')}รายละเอียดงาน · ค่าที่ระบบกรอก</summary><div class="grp">${rows}${j.f040 === 'approved' ? f040Row(S, j) : ''}${prepRows(S, j, false)}</div></details></div>`;
+  return `${nav(F.navTitle(j), back)}<div class="in pt2">${j.status === 'done' ? '' : stageBar(j, ph)}
+ ${todoCard(S, j, ph)}
+ <div class="grp card"><div class="gh">นำเข้าผลหน้างาน<span class="sub">ไฟล์ · รูป · กระดาษที่จดค่า ระบบเติมฟอร์มให้ · อ่านในเครื่อง ไม่ส่งออกนอกเครื่อง</span></div>
  <div class="row pr"><button class="btn alt" data-cam="attach">${ic('cam')}ถ่ายรูป</button><button class="btn alt" data-file="attach">${ic('doc')}เลือกไฟล์</button></div>
- ${(j.files || []).length ? fileRows(S, j) : `<div class="row"><span class="sec">ยังไม่มีไฟล์ · แนบฟอร์มที่กรอกในคอม (.xlsx .docx) รูป หรือ PDF</span></div>`}</div>
- <div class="grp card"><div class="gh">กรอกฟอร์ม<span class="sub">ตามขอบเขต WI · ${nPend ? `เติมจากไฟล์แล้ว รอยืนยัน ${nPend} ช่อง` : 'ไฟล์เติมให้ก่อน ที่เหลือกรอกเอง'}</span></div>${forms}</div></div>`;
+ <!-- fieldsheet-print-slot: ปุ่ม "พิมพ์ใบจดค่า" (lane 5 เสียบหลัง PR นี้ merge) -->
+ ${(j.files || []).length ? fileRows(S, j) : `<div class="row"><span class="sec">ยังไม่มีไฟล์ · แนบฟอร์มที่กรอกในคอม (.xlsx .docx) รูป หรือ PDF · ไม่รับวิดีโอ</span></div>`}</div>
+ <div class="grp card"><div class="gh">ฟอร์ม<span class="sub">ตามขอบเขต WI · ${nPend ? `เติมจากไฟล์แล้ว รอยืนยัน ${nPend} ช่อง` : 'ไฟล์เติมให้ก่อน ที่เหลือกรอกเอง'}</span></div>${forms}
+ <button class="row" data-sheet="example"><span class="rt"><span class="cap">ตัวอย่างรายงานที่ใช้เทียบ</span><span>${ex ? esc(ex.title) : 'ยังไม่มีตัวอย่าง'} · <b class="lnk">เปลี่ยน</b></span></span>${chev}</button></div>
+ ${detail}</div>`;
 }
 
 // ---------- หน้ากรอกค่า (เครื่องส่ง FM-202) ----------
@@ -249,6 +279,8 @@ const fld = (S, f, t, n) => {
   <input inputmode="decimal" enterkeyhint="next" value="${esc(v)}" data-n="${n}" data-k="${f.k}" aria-label="${esc(f.n)}"><span class="u">${f.u}</span>${f.cam ? camBtn(S, `${n}.${f.k}`, t.photos[f.k], 'ถ่ายรูป ' + f.t) : ''}</label>`;
 };
 const idFld = (S, t, n, k, title, sub) => `<label class="fld" data-lbl="${title}"><span class="rt"><span class="t">${title}</span><span class="sub">${sub}</span>${t.pend && t.pend[k] ? fileTag : ''}</span><input class="wide" enterkeyhint="next" autocapitalize="off" autocomplete="off" value="${esc(t.v[k] ?? '')}" data-n="${n}" data-k="${k}" aria-label="${title}">${camBtn(S, `${n}.${k}`, t.photos[k], 'ถ่ายรูป ' + title)}</label>`;
+// รูปหลักฐานของงาน (กระดาษจดค่า/ลายมือ ที่อ่านไม่ได้) แสดงข้างฟอร์ม ให้พิมพ์ค่าเองโดยมองรูป
+const evidence = (S, j) => { const L = (j.files || []).filter(f => S.ph[f.id] && /^image\//.test(f.type) && (!f.target || f.target === 'FM-CE.SE-202')); return L.length ? `<div class="sh">รูปประกอบ · ดูเทียบตอนพิมพ์ค่า</div><div class="ph">${L.map(f => `<button class="tile" data-sheet="file:${j.files.indexOf(f)}" aria-label="${esc(f.name)}"><img src="${S.ph[f.id]}" alt=""></button>`).join('')}</div>` : ''; };
 const confirmBar = j => { const p = F.formProg(j, j.forms.find(f => f.kind === 'tx') || {}); return p.pend ? `<div class="pad2"><button class="btn alt" data-confirm-form="FM-CE.SE-202">${ic('done')}ยืนยันทั้งหมดในฟอร์มนี้ · ${p.pend} ช่อง</button></div>` : ''; };
 export function fill(S, _, back) {
   const j = S.job, m = j.cur, t = j.tx[m - 1], k = txDoneCount(j);
@@ -256,11 +288,11 @@ export function fill(S, _, back) {
   return `${nav(`เครื่องส่ง ${m}/${j.tx.length}`, back)}<div class="in"><div class="strip-w"><div class="strip" id="strip">${chips}</div>
  <div class="prg"><span class="cap">${m} จาก ${j.tx.length} · เสร็จ <span class="cnt" data-v="${k}">${k}</span></span><div class="bar3"><i style="width:${100 * k / j.tx.length}%"></i></div></div></div>
  <div class="sh">ข้อมูลเครื่อง · อ่านจากสติกเกอร์</div><div class="grp">${idFld(S, t, m, 'asset', 'Asset No', 'จากสติกเกอร์ทรัพย์สิน')}${idFld(S, t, m, 'serial', 'Serial', 'จากแผ่นป้ายเครื่อง')}</div>
- <div class="sh">ค่าที่วัด</div><div class="grp">${j.fields.map(f => fld(S, f, t, m)).join('')}</div>${confirmBar(j)}</div>`;
+ <div class="sh">ค่าที่วัด</div><div class="grp">${j.fields.map(f => fld(S, f, t, m)).join('')}</div>${evidence(S, j)}${confirmBar(j)}</div>`;
 }
 const wiText = `<div class="grp"><div class="p16"><div class="cap">ขั้นตอน</div>ต่อ CMA180 เข้า Ant port ผ่าน Attn 30 dB ตั้ง… (ข้อความตัวอย่าง)</div></div>`;
 export function table(S, _, back) {
-  const j = S.job, m = j.cur, k = txDoneCount(j), cols = j.fields, pd = S.docs.find(d => d.system === j.system) || S.docs[0];
+  const j = S.job, m = j.cur, k = txDoneCount(j), cols = j.fields, pd = exampleOf(S, j) || S.docs[0];
   const body = j.tx.map(t => `<tr><td>${t.n}</td>${cols.map(f => `<td${bad(f, t.v[f.k] ?? '') ? ' class="bad"' : t.pend && t.pend[f.k] ? ' class="pd"' : ''}><input inputmode="decimal" enterkeyhint="next" value="${esc(t.v[f.k] ?? '')}" data-n="${t.n}" data-k="${f.k}" aria-label="Tx ${t.n} ${esc(f.n)}"></td>`).join('')}</tr>`).join('');
   return `${nav(`FM-CE.SE-202 · เครื่องส่ง ${j.tx.length} เครื่อง`, back)}<div class="tb2"><div class="tl"><div class="prg pt2"><span class="cap">${m} จาก ${j.tx.length} · เสร็จ <span class="cnt" data-v="${k}">${k}</span></span><div class="bar3"><i style="width:${100 * k / j.tx.length}%"></i></div></div>
  ${confirmBar(j)}<table><thead><tr><th>Tx</th>${cols.map(f => `<th>${esc(f.n).replace(' (', '<br>(')}</th>`).join('')}</tr></thead><tbody id="tbd">${body}</tbody></table><p class="sec">Apple Pencil เขียนลงช่องได้เลย (Scribble) · ช่องขอบประ = เติมจากไฟล์ รอยืนยัน (แก้ค่าหรือกดยืนยันทั้งหมด)</p></div>
@@ -356,8 +388,13 @@ export function sheet(S, kind, id) {
   }
   if (kind === 'val') { const [sc, key] = id.split(/:(.+)/); return valSheet(S, sc, key); }
   if (kind === 'stages') {
-    const j = S.job, s = F.stageOf(j, ctxOf(S));
-    return h('6 ขั้นของงาน PM (QP-CE.SE-01)', `<div class="grp">${F.STAGES.map(([, n, ds], i) => `<div class="row">${ring(i < s ? 1 : 0, i < s ? 'ผ่านแล้ว' : i === s ? 'ขั้นนี้' : 'ยังไม่ถึง')}<span class="rt"><span${i === s ? ' class="cur"' : ''}>${i + 1}. ${n}${i === s ? ' · ขั้นนี้' : ''}</span><span class="sub">${ds}</span>${st(i < s ? 'ok' : 'todo', i < s ? 'ผ่านแล้ว' : i === s ? 'กำลังทำ' : 'ยังไม่ถึง')}</span></div>`).join('')}</div>`);
+    const j = S.job, p = F.phaseOf(j, ctxOf(S));
+    return h('3 ขั้นของงาน PM', `<div class="grp">${F.PHASES.map(([, n, ds], i) => `<div class="row">${ring(i < p ? 1 : 0, i < p ? 'ผ่านแล้ว' : i === p ? 'ขั้นนี้' : 'ยังไม่ถึง')}<span class="rt"><span${i === p ? ' class="cur"' : ''}>${i + 1}. ${n}${i === p ? ' · ขั้นนี้' : ''}</span><span class="sub">${ds}</span>${st(i < p ? 'ok' : 'todo', i < p ? 'ผ่านแล้ว' : i === p ? 'กำลังทำ' : 'ยังไม่ถึง')}</span></div>`).join('')}</div>`);
+  }
+  if (kind === 'example') {
+    const j = S.job, cur = exampleOf(S, j), mineA = S.docs.filter(d => isMine(S, d) && d.status === 'accepted'), ex = examples(S);
+    const list = L => `<div class="grp" role="radiogroup" aria-label="ตัวอย่าง">${L.map(d => `<button class="row" role="radio" aria-checked="${cur && cur.id === d.id}" data-ex="${esc(d.id)}"><span class="rt"><span>${esc(d.title)}</span><span class="sub">${d.dates ? dRange(d.dates) + ' · ' : ''}${d.pages} หน้า</span></span>${ic('ok', 'ck')}</button>`).join('')}</div>`;
+    return h('เลือกตัวอย่างรายงาน', `${mineA.length ? `<div class="sh">ย้อนหลังของฉัน (ผู้ตรวจรับแล้ว)</div>${list(mineA)}` : ''}<div class="sh">ตัวอย่างรายงานของกอง</div>${list(ex)}`);
   }
   if (kind === 'file') {
     const j = S.job, f = j.files[+id], u = S.ph[f.id], img = u && /^image\//.test(f.type), [k] = FILE_ST[f.state] || FILE_ST.unsorted;

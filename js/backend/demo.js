@@ -70,6 +70,7 @@ function seedTx() {
     if (n === 7) { v.asset = '1-160-03155'; v.pow = '27.2'; v.tout = ''; }
     return { n, freq, model: 'PAE T6T', reg: reg(n), v, photos: {} };
   });
+  j.pm.people = ['ต่อเกียรติ', 'สมหมาย']; j.vals.people.v = 'ต่อเกียรติ, สมหมาย'; delete j.vals.people.pending;
   return Object.assign(j, { f040: 'approved', dates: ['2026-07-29', '2026-07-31'], touched: '2026-07-27T10:00:00Z', ready: { rev: true, f005: true, man: true }, fields, tx, cur: 7, assetCheck: [6, 7, 8],
     vals: { ...j.vals, f040: { v: 'อนุมัติแล้ว · วส.บว-ตัวอย่าง 13/2569', src: 'sarabun', loc: 'บันทึกงาน เลขทะเบียน ตัวอย่าง', at: '2026-07-27' }, dates: { v: '29–31 ก.ค. 69', src: 'sarabun', loc: 'FM-040 · วันเวลาเริ่ม–เสร็จ', at: '2026-07-27' } },
     forms: j.forms.map(f => f.kind === 'tx' || f.code === 'FM-CE.SE-202' ? { ...f, kind: 'tx' } : f.code === 'FM-CE.SE-001' ? { ...f, kind: 'asset' } : f.code === 'FM-CE.SE-041' ? { ...f, done: true } : f) });
@@ -89,5 +90,11 @@ export const prevRound = site => ({ eng: ['ตัวอย่าง ก.', 'ต�
   tools: [['Test Set CMA180', '1-160-02231-0000', '2026-09-16'], ['ZVH8 Spectrum Analyzer', '1-160-03217-0000', '2026-12-01'], ['Digital Clamp Meter', '1-160-03155-0000', '2027-02-20'], ['Attenuator 30 dB', '1-160-02102', '2027-04-12']].map(([name, asset, due]) => ({ name, asset, due })) });
 // งานของ PM: โครง schema 2 (ดู flow.js newPmJob) · งานจาก backend โครงเดิมผ่าน normJob
 export const genericJob = (id, title, system, round, dates, status, touched) => normJob({ schema: 2, id, title, round, system, dates, status, touched, cur: 1, letter: false, forms: formsFor(title) });
-export const listJobs = async () => [seedTx()];
+// งานเลยกำหนดส่ง (ตัวอย่าง): RCAG เขาพระบาท ลำปาง ทำเสร็จ 12 มิ.ย. → ครบ 20 วันทำการ 10 ก.ค. → เลยกำหนด
+function seedLate() {
+  const row = SCHEDULE.find(r => r.job.startsWith('สถานี RCAG เขาพระบาท') && r.ym === '2026-07');
+  const j = newPmJob({ id: 'rcag-kpb-2-69', row, system: '', eng: 'ตัวอย่าง ข.', travel: 'เครื่องบิน', draft: false, prev: prevRound('สถานี'), now: '2026-06-09T10:00:00Z' });
+  return Object.assign(j, { f040: 'approved', dates: ['2026-06-10', '2026-06-12'], touched: '2026-06-12T10:00:00Z', ready: { rev: true, f005: true, man: true } });
+}
+export const listJobs = async () => [seedTx(), seedLate()];
 export const getCatalog = async () => catalog;
