@@ -1,7 +1,7 @@
 // cache-first สำหรับไฟล์แอป · network-first สำหรับข้อมูล (/api/ /data/) · เปลี่ยน VERSION ทุกครั้งที่แก้ไฟล์
-const VERSION = 'pms-v0.3.0';
+const VERSION = 'pms-v0.4.0';
 const FILES = ['./', './index.html', './manifest.webmanifest', './ui/tokens.css', './ui/base.css', './ui/icons.svg',
-  './js/app.js', './js/views.js', './js/gestures.js', './js/store.js', './js/photos.js', './js/tok.js', './js/backend/demo.js', './js/backend/sharepoint.js',
+  './js/app.js', './js/views.js', './js/gestures.js', './js/store.js', './js/photos.js', './js/tok.js', './js/config.js', './js/backend/supabase.js', './js/backend/demo.js', './js/backend/sharepoint.js',
   './icons/icon.svg', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png'];
 
 // precache ด้วย cache:'reload' — ข้าม HTTP cache ของเบราว์เซอร์/CDN ไม่งั้นเวอร์ชันใหม่จะเก็บไฟล์เก่าไว้ใต้ชื่อใหม่

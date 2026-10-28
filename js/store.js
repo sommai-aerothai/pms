@@ -2,12 +2,18 @@
 import * as demo from './backend/demo.js';
 import { wipe as wipePhotos } from './photos.js';
 import * as sharepoint from './backend/sharepoint.js';
+import * as supabase from './backend/supabase.js';
+import { CONFIG } from './config.js';
 
 const ls = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },   // false = พื้นที่เต็ม
 };
-const be = () => ({ demo, sharepoint }[localStorage.getItem('pms.backend') || 'demo'] || demo);
+const BE = { demo, sharepoint, supabase };
+export const backendName = () => { let v; try { v = localStorage.getItem('pms.backend'); } catch {} return BE[v] ? v : BE[CONFIG.backend] ? CONFIG.backend : 'demo'; };   // ค่าดิบ ไม่ใช่ JSON
+const be = () => BE[backendName()];
+export const setBackend = n => { try { localStorage.setItem('pms.backend', n); } catch {} };
+export const auth = () => be();   // requestOtp / verifyOtp / me (เฉพาะ backend จริง)
 
 export const listDocs = p => be().listDocs(p || {});
 export const getDocUrl = id => be().getDocUrl(id);
@@ -38,6 +44,6 @@ export const setOffline = (id, on) => ls.set('pms.offline', { ...(ls.get('pms.of
 export const offlineCount = () => Object.values(ls.get('pms.offline') || {}).filter(Boolean).length;
 // ออกจากระบบ: ลบเฉพาะคีย์ pms.* (+ รูปของ PMS) · ไม่แตะข้อมูลอื่นบนออริจินเดียวกัน
 export const signOut = async () => {
-  try { Object.keys(localStorage).filter(k => k.startsWith('pms.')).forEach(k => localStorage.removeItem(k)); } catch {}
+  try { Object.keys(localStorage).filter(k => k.startsWith('pms.') && k !== 'pms.backend').forEach(k => localStorage.removeItem(k)); } catch {}
   await wipePhotos();
 };

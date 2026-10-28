@@ -60,7 +60,7 @@ export function today(S) {
   const chk = blk.length ? `${blk.map(x => `<div class="srow">${x[0]}</div>`).join('')}<div class="p16">${act(blk[0][1], 'ตรวจรายการ')}</div>` : `<div class="srow">${st('ok', 'พร้อมทำงาน')}</div>`;
   const nt = ft && (tx.find(t => !txDone(j, t) && t.n !== ft.n) || ft);
   const nxt = !j
-    ? `<div class="p16"><div class="big">เปิดรายงานรอบก่อน</div><div class="sec">${esc(prev.title)} · ดูตัวอย่างก่อนเริ่มงาน</div><div class="mt3">${act('#/today/doc/' + prev.id, 'ไปขั้นถัดไป')}</div></div>`
+    ? !prev ? `<div class="p16"><div class="big">ยังไม่มีงาน PM</div><div class="sec">สร้างงานใหม่ที่แท็บ งาน PM</div></div>` : `<div class="p16"><div class="big">เปิดรายงานรอบก่อน</div><div class="sec">${esc(prev.title)} · ดูตัวอย่างก่อนเริ่มงาน</div><div class="mt3">${act('#/today/doc/' + prev.id, 'ไปขั้นถัดไป')}</div></div>`
     : !tx ? `<div class="p16"><div class="big">ทำฟอร์มที่เหลือ</div><div class="sec">ยังไม่เสร็จ ${j.forms.length - k} ฟอร์ม</div><div class="mt3">${act(base, 'ไปขั้นถัดไป')}</div></div>`
     : `<div class="p16">${ft ? `<div class="big">กรอกค่าเครื่องส่ง ${nt.n}</div><div class="sec">แล้วจึงตรวจเลขทรัพย์สิน · หลังกรอกครบ</div><div class="mt3">${act(base + '/fill', 'ไปขั้นถัดไป', `cur:${nt.n}:${j.id}`)}</div>` : `<div class="big">ตรวจเลขทรัพย์สิน</div><div class="sec">ค่าเครื่องส่งครบแล้ว</div><div class="mt3">${act(base + '/asset', 'ไปขั้นถัดไป')}</div>`}</div>`;
   return `${nav('วันนี้')}<div class="in today"><h1 class="lt">วันนี้</h1>
@@ -97,9 +97,9 @@ const filterBar = (ph, a = '') => `<label class="search">${ic('search')}<input t
 export const searchFiles = (S, q) => { const r = S.files.filter(f => `${f.code} ${f.title} ${f.tag}`.toLowerCase().includes(q));
   return r.length ? r.map(f => fileRow(S, f)).join('') : '<div class="empty">ไม่พบในไฟล์ตัวอย่าง</div>'; };
 export function docs(S) {
-  const at = S.cats[0].rows[0].fetchedAt;
+  const at = S.cats[0]?.rows[0]?.fetchedAt;
   return `${nav('เอกสาร')}<div class="in">${ptr}<h1 class="lt">เอกสาร</h1>${filterBar('ค้นหาเอกสาร (รหัสหรือชื่อ)', '="docs"')}
- <div class="grp"><div class="kv"><span>จากเว็บกอง ${dShort(at)} ${hhmm(at)}</span>${st('ok', 'เป็นปัจจุบัน')}</div></div>
+ <div class="grp"><div class="kv"><span>จากเว็บกอง ${at ? `${dShort(at)} ${hhmm(at)}` : 'ยังไม่มีข้อมูล'}</span>${st('ok', 'เป็นปัจจุบัน')}</div></div>
  <div class="grp" id="dcats">${S.cats.map(c => `<a class="row" href="#/docs/k/${c.id}">${ic('folder', 'lead')}<span class="rt"><span>${esc(c.name)}</span></span><span class="rv">${c.total} ไฟล์</span>${chev}</a>`).join('')}</div>
  <div class="grp" id="dres" hidden></div></div>`;
 }
@@ -203,9 +203,10 @@ export function folder(S, _, back) {
 export function me(S) {
   const r = (i, t, s) => `<button class="row" data-toast="โหมดตัวอย่าง · ยังไม่เปิดใช้">${ic(i, 'lead')}<span class="rt"><span>${t}</span><span class="sub">${s}</span></span>${chev}</button>`, auto = store.pref('auto') !== false;
   return `${nav('ฉัน')}<div class="in"><h1 class="lt">ฉัน</h1><div class="hero"><div class="avatar">${esc([...S.user.name][0])}</div><div class="big">${esc(S.user.name)}</div><div class="sec">${esc(S.user.email || 'CE.SE · AEROTHAI')}</div></div>
- <div class="grp">${r('ok', 'บัญชีบริษัท', 'โหมดตัวอย่าง · ยังไม่เชื่อมต่อ')}${r('sig', 'ลายเซ็นของฉัน', 'ใช้ตอนออกรายงาน')}${r('gear', 'ตั้งค่า', 'แจ้งเตือนรอบ PM · calibration')}</div>
+ <div class="grp">${r('ok', 'บัญชีบริษัท', store.backendName() === 'demo' ? 'โหมดตัวอย่าง · ยังไม่เชื่อมต่อ' : S.user.email || '')}${r('sig', 'ลายเซ็นของฉัน', 'ใช้ตอนออกรายงาน')}${r('gear', 'ตั้งค่า', 'แจ้งเตือนรอบ PM · calibration')}</div>
+ <div class="sh">เชื่อมต่อ</div><div class="grp"><div class="kv"><span>เซิร์ฟเวอร์: ${store.backendName() === 'demo' ? 'ตัวอย่าง (demo)' : 'Supabase'}</span><button class="btn alt" data-be="${store.backendName() === 'demo' ? 'supabase' : 'demo'}">สลับเป็น ${store.backendName() === 'demo' ? 'Supabase' : 'demo'}</button></div></div>
  <div class="sh">พื้นที่ offline</div><div class="grp"><div class="kv"><span>ตั้งเก็บ offline อัตโนมัติ · ตัวอย่าง (ยังไม่โหลดไฟล์จริง)</span>${sw(auto, 'data-pref="auto" aria-label="ตั้งเก็บ offline อัตโนมัติ (ตัวอย่าง)"')}</div><div class="kv"><span>ตั้งไว้ในเครื่อง</span><span>${store.offlineCount()} รายการ</span></div></div>
- <div class="grp">${r('info', 'เกี่ยวกับ / เวอร์ชัน', `${S.version} (demo)`)}</div>
+ <div class="grp">${r('info', 'เกี่ยวกับ / เวอร์ชัน', `${S.version} (${store.backendName()})`)}</div>
  <div class="grp k"><button class="row red" data-signout>${ic('out')}ออกจากระบบ</button></div></div>`;
 }
 

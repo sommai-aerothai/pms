@@ -91,7 +91,7 @@ h1.lt{font-size:var(--fs-title);line-height:1.2;font-weight:700;margin:0 var(--s
 /* iPad split */
 .detail{display:none}
 .pad .detail{display:block}
-.pad .split{display:grid;grid-template-columns:var(--u-320) 1fr}
+.pad .split{display:grid;grid-template-columns:var(--u-360) 1fr}
 .pad .split .side{border-right:var(--hair) solid var(--sep)}
 .pad .split .side .grp,.pad .split .detail .grp{margin-left:var(--space-3);margin-right:var(--space-3)}
 .pad .row.sel{background:var(--press)}
@@ -205,6 +205,8 @@ td.bad::after{content:"⚠︎ เกินช่วง";display:block;text-align
 .lg1,.lg2{width:100%;max-width:var(--u-340);flex-direction:column;align-items:center;gap:var(--space-3)}
 .lg1{display:flex}.lg2{display:none}
 .code .lg1{display:none}.code .lg2{display:flex}
+.lg3{display:none;width:100%;max-width:var(--u-340);flex-direction:column;align-items:center;gap:var(--space-3)}
+.wait .lg1,.wait .lg2{display:none}.wait .lg3{display:flex}.lg3 .ic{width:var(--u-36);height:var(--u-36);color:var(--accent)}
 .lg1 .search{margin:0;width:100%}
 .codes{display:flex;gap:var(--space-2);width:100%;justify-content:center}
 .codes input{flex:1;min-width:0;max-width:var(--u-48);height:var(--u-48);padding:0;text-align:center;font-size:var(--fs-value);border:var(--hair) solid var(--ctrl-border);border-radius:var(--radius-control);background:var(--card);outline:0}
@@ -217,3 +219,4 @@ td.bad::after{content:"⚠︎ เกินช่วง";display:block;text-align
 .vbd{position:sticky;top:calc(var(--st) + var(--tap) + var(--space-2));z-index:3;height:0;text-align:center}
 [role=radio] .ck{color:var(--accent);visibility:hidden}[role=radio][aria-checked=true] .ck{visibility:visible}
 .search .cap{flex:none}
+.kv .btn{width:auto;min-height:var(--u-36);padding:0 var(--space-4);flex:none}
