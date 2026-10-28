@@ -1,5 +1,5 @@
 // cache-first สำหรับไฟล์แอป · network-first สำหรับข้อมูล (/api/ /data/) · เปลี่ยน VERSION ทุกครั้งที่แก้ไฟล์
-const VERSION = 'pms-v0.5.0';
+const VERSION = 'pms-v0.5.1';
 const FILES = ['./', './index.html', './manifest.webmanifest', './ui/tokens.css', './ui/base.css', './ui/icons.svg',
   './js/app.js', './js/views.js', './js/gestures.js', './js/store.js', './js/photos.js', './js/tok.js', './js/config.js', './js/backend/supabase.js', './js/backend/demo.js', './js/backend/sharepoint.js',
   './icons/icon.svg', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png'];

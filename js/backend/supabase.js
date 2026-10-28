@@ -14,7 +14,7 @@ async function call(path, { method = 'GET', body, headers = {}, auth = true, raw
   if (navigator.onLine === false) fail('offline');
   let s = session();
   if (auth && s && s.expires_at * 1000 < Date.now() + 30000) s = await refresh();
-  const h = { apikey: CONFIG.anonKey, Authorization: `Bearer ${(auth && s && s.access_token) || CONFIG.anonKey}`, ...headers };
+  const h = { apikey: CONFIG.anonKey, ...((auth && s && s.access_token) ? { Authorization: `Bearer ${s.access_token}` } : {}), ...headers };   // publishable key ส่งเฉพาะ apikey · Bearer เฉพาะเมื่อมี token ผู้ใช้
   if (body !== undefined && !(body instanceof Blob)) { h['Content-Type'] = 'application/json'; body = JSON.stringify(body); }
   let r;
   try { r = await fetch(CONFIG.supabaseUrl + path, { method, headers: h, body }); } catch { fail('offline'); }

@@ -263,14 +263,15 @@ let busy = false;
 async function finishLogin(recheck = false) {
   if (busy) return; busy = true; loginErr('');
   try {
-    let u = { name: 'สมหมาย', email: $('#email').value.trim() };
+    const raw = $('#email').value.trim(), pwRaw = $('#pass').value;
+    if (!recheck && (!raw || !pwRaw)) return loginErr(LOGIN_ERR.auth);   // ทั้ง demo และจริง: ต้องกรอกทั้งคู่
+    let u = { name: 'สมหมาย', email: raw };
     if (real()) {
       if (notReady()) return loginErr(LOGIN_ERR.server);
-      const em = $('#email').value.trim(), pw = $('#pass').value;
-      if (!recheck && (!em || !pw)) return loginErr(LOGIN_ERR.auth);
+      const em = raw.includes('@') ? raw : raw + '@aerothai.co.th', pw = pwRaw;   // พิมพ์ sommai.sa = sommai.sa@aerothai.co.th
       try {
         const a = store.auth();
-        if (!recheck) await a.signIn(em, pw);
+        if (!recheck) { await a.signIn(em, pw); $('#pass').value = ''; $('#pass').type = 'password'; }   // ไม่ให้รหัสผ่านค้างในช่อง
         const p = await a.me(); $('#s-login').classList.toggle('wait', !p.approved);
         if (!p.approved) return;
         u = { name: p.name || p.email, email: p.email }; await load();
