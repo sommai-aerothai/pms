@@ -252,3 +252,7 @@ td.bad::after{content:"⚠︎ เกินช่วง";display:block;text-align
 .dhome>.sk{margin:0}
 @keyframes shimmer{to{background-position:-200% 0}}
 .cnt{font-weight:inherit}
+/* ขั้นตอนติดตั้งบุ๊กมาร์กเล็ต (เชื่อมสารบรรณ) */
+.stp{display:flex;gap:var(--space-3);align-items:flex-start;padding:var(--space-3) var(--space-4)}
+.stp .n{flex:none;display:grid;place-items:center;width:var(--u-28);height:var(--u-28);border-radius:var(--radius-round);background:var(--accent);color:var(--accent-on-fill);font-weight:700;font-size:var(--fs-sub)}
+.stp .rt{display:flex;flex-direction:column;gap:var(--space-1);min-width:0}.stp .sub{font-size:var(--fs-sub);color:var(--text-2)}.stp .st{align-self:flex-start}

@@ -95,5 +95,6 @@ export const genericJob = (id, title, system, round, dates, status, touched) => 
   forms: GENERIC_FORMS.map(([code, name]) => ({ code, name, kind: status === 'done' ? 'done' : 'todo' })), tools: [], folder: { photos: [], docs: [] } });
 export const listJobs = async () => [seedTx(),
   genericJob('dm-cctv-1-70', 'DM CCTV 1/70', 'cctv', '1/70', ['2026-11-18', '2026-11-19'], 'todo', '2026-10-26T08:00:00Z'),
+  genericJob('dm-txs-2-69', 'DM TX Radio STBY 2/69', 'tx-stby', '2/69', ['2026-08-04', '2026-08-06'], 'done', '2026-08-06T09:00:00Z'),
   genericJob('dm-vccs-2-69', 'DM VCCS (หอฯ ด้านทิศใต้) 2/69', 'vccs', '2/69', ['2026-08-10', '2026-08-12'], 'done', '2026-08-12T09:00:00Z')];
 export const getCatalog = async () => catalog;
