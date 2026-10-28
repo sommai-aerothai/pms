@@ -45,7 +45,7 @@ const isPdf = d => extOf(d.file || d.storagePath) === 'pdf';
 export const mergeFormats = rows => {
   const by = new Map(), out = [];
   for (const d of rows) {
-    const k = d.code ? d.code.toLowerCase() : '', g = k && by.get(k);
+    const k = d.code && d.title ? `${d.code}|${d.title}`.toLowerCase() : '', g = k && by.get(k);
     if (!g) { const x = { ...d }; out.push(x); if (k) by.set(k, x); continue; }
     const [pdf, other] = isPdf(g) && !isPdf(d) ? [g, d] : !isPdf(g) && isPdf(d) && !g.editable ? [d, g] : [null, null];
     if (!pdf || pdf.editable || !other.storagePath || (g.rev && d.rev && g.rev !== d.rev)) { out.push({ ...d }); continue; }   // ไม่รวมถ้าไฟล์แก้ได้ไม่มีในระบบ (เหลือแต่ลิงก์เว็บ) หรือคนละ Rev
