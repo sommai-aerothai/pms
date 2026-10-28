@@ -21,7 +21,7 @@ const APP = new URL('../', location.href).href;
 async function boot(be, fake) {
   localStorage.clear();
   localStorage.setItem('pms.backend', be);
-  localStorage.setItem('pms.user', JSON.stringify({ name: 'สมหมาย', email: 'sommai.sa@aerothai.co.th' }));
+  localStorage.setItem('pms.user', JSON.stringify({ name: 'สมหมาย', email: 'sommai.sa@aerothai.co.th', id: 'demo-admin', is_admin: true }));
   if (be === 'supabase') localStorage.setItem('pms.session', JSON.stringify({ access_token: 'T', refresh_token: 'R', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'u1' } }));
   window.__fake = fake; window.__supa = CONFIG.supabaseUrl;
   const html = await (await fetch('../index.html', { cache: 'no-store' })).text();
@@ -80,6 +80,21 @@ async function walk(be, A) {
   for (const h of yr.map(y => y.getAttribute('href'))) { await go(A, h, 's-rounds'); rd = A.$$('#s-rounds.on a.row'); if (rd.length) break; } ok(rd.length && rd.every(r => tappable(A, r)), `${be}: รอบในปี ${rd.length} รายงาน แตะได้`);
   await tap(A, rd[0]); const rv = await until(() => A.$('#s-view.on')); ok(rv && !/undefined|NaN/.test(rv.textContent), `${be}: แตะรายงาน → ตัวดู`);
   const pm = await go(A, '#/pm', 's-pm'); ok(pm && !/undefined|NaN/.test(pm.textContent) && !A.$('#s-pm .errc'), `${be}: แท็บ งาน PM วาดได้`);
+  if (be === 'demo') {   // ฉัน › ตั้งค่า › ผู้ใช้ › เพิ่ม › ผู้ใช้ใหม่อยู่ในรายการ · รหัสชั่วคราวโชว์ครั้งเดียว ไม่ค้างหลังปิด
+    await go(A, '#/me', 's-me'); ok(/ตั้งค่า/.test(A.$('#s-me a[href="#/me/users"]')?.textContent || ''), 'demo: ฉัน › ตั้งค่า เป็นลิงก์ไปหน้าผู้ใช้ (แอดมิน)');
+    const us = await go(A, '#/me/users', 's-users'); ok(us && /sommai\.sa/.test(us.textContent) && us.querySelector('.st .ic') && /ปิดใช้งาน/.test(us.textContent), 'demo: หน้าผู้ใช้ แสดงรายชื่อ + สถานี icon+คำ');
+    const set = (id, v) => { const i = A.$('#sheet ' + id); i.value = v; i.dispatchEvent(new A.w.Event('input', { bubbles: true })); };
+    A.$('#s-users [data-sheet="uadd"]').click(); ok(await until(() => A.$('#sheet.open #uUser')), 'demo: กด เพิ่มผู้ใช้ → sheet เปิด');
+    A.$('#sheet [data-u-gen]').click(); const pw = A.$('#uPw').value; ok(/^[A-Za-z0-9]{12}$/.test(pw), 'demo: สุ่มรหัส 12 ตัว');
+    A.$('#sheet [data-u-add]').click(); ok(await until(() => A.$('#sheet #uErr:not([hidden])')), 'demo: ช่องว่าง → ขึ้นข้อความผิดพลาด ไม่สร้าง');
+    set('#uName', 'ทดสอบ อี'); set('#uUser', 'E2E.User'); A.$('#sheet [data-u-add]').click();
+    const t = await until(() => A.$('#sheet.open #tmpPw')); ok(t && t.textContent === pw, 'demo: สร้างแล้วโชว์รหัสชั่วคราว (ตรงกับที่สุ่ม)');
+    ok(!JSON.stringify(A.w.localStorage).includes(pw), 'demo: รหัสชั่วคราวไม่ถูกเก็บใน localStorage');
+    A.$('#sheet [data-close]').click(); await sleep(900); ok(!A.w.document.body.textContent.includes(pw), 'demo: ปิด sheet แล้วรหัสหายจากหน้า');
+    ok(await until(() => /e2e\.user/.test(A.$('#s-users').textContent) && /ทดสอบ อี/.test(A.$('#s-users').textContent)), 'demo: ผู้ใช้ใหม่ (ตัวพิมพ์เล็ก) อยู่ในรายการ');
+    const row = A.$('#s-users [data-uid$="e2e.user"]'); row.querySelector('[data-u-set]').click(); ok(await until(() => /ปิดใช้งาน/.test(A.$('#s-users [data-uid$="e2e.user"]').textContent)), 'demo: ปิดการใช้งานแล้วสถานะเปลี่ยน');
+    ok(!A.$('#s-users [data-uid="demo-admin"] [data-u-set]'), 'demo: บัญชีตัวเองไม่มีปุ่มปิดการใช้งาน');
+  }
   ok(!errs().length, `${be}: ไม่มี error ที่ไม่ได้จับ${errs().length ? ' · ' + errs().join(' | ') : ''}`);
   A.f.remove();
 }

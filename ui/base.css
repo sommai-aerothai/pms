@@ -341,3 +341,6 @@ td.pd input{border-style:dashed}
 .dots .d.dn{background:var(--accent);border-color:var(--accent)}
 .dots .d.cur{width:var(--u-14);height:var(--u-14);border:var(--u-3) solid var(--accent)}
 .lnk{color:var(--accent-text);font-weight:600}
+/* ผู้ใช้ (แอดมิน): ปุ่มแถวผู้ใช้ + รหัสชั่วคราว */
+.uact{display:flex;flex-wrap:wrap;gap:var(--space-2);margin-top:var(--space-3)}
+.mono,.search input.mono{font-family:var(--font-mono)}.big.mono{overflow-wrap:anywhere;user-select:all;letter-spacing:.04em}

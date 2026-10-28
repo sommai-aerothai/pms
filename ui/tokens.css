@@ -1,5 +1,6 @@
 /* ===== design tokens: ทุกค่าดีไซน์อยู่ที่นี่ที่เดียว · ui/base.css อ้าง token เท่านั้น ===== */
 :root{
+--font-mono:ui-monospace,SFMono-Regular,Menlo,monospace;
 /* colours (light) */
 --bg:#f2f2f7;--card:#fff;--text:#000;--text-2:#6e6e73;--sep:#e5e5ea;--ctrl-border:#6e7787;
 --accent-h:211;--accent-l:46.5%;--accent-tl:38.4%;

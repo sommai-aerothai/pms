@@ -44,6 +44,20 @@ export const addJob = job => {
   return true;
 };
 
+// ---------- แอดมินจัดการผู้ใช้ (ฉัน › ตั้งค่า › ผู้ใช้) ----------
+// ตรวจรูปแบบฝั่งแอปก่อนยิง (เซิร์ฟเวอร์ตรวจซ้ำ ด้วยกฎเดียวกัน) · ผิด = throw { code:'invalid', field } · backend ไม่มีฟังก์ชัน (sharepoint) = notdeployed
+export const USER_RE = /^[a-z0-9._-]{3,40}$/, MIN_PW = 10;
+export const adminUsers = async (action, body = {}) => {
+  const bad = f => { throw { code: 'invalid', retryAfter: 0, field: f }; };
+  if (action === 'create') { if (!USER_RE.test(body.username || '')) bad('username'); if (!String(body.name || '').trim()) bad('name'); }
+  if (action === 'create' || action === 'reset') { if (String(body.password || '').length < MIN_PW) bad('password'); }
+  if (!be().adminUsers) throw { code: 'notdeployed', retryAfter: 0 };
+  return be().adminUsers(action, body);
+};
+// รหัสผ่านสุ่ม 12 ตัวจาก crypto (ตัดตัวที่อ่านสับสน I O l 0 1) · สุ่มแบบ rejection กันเอนเอียง
+const PWA = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+export const genPassword = (n = 12) => { const lim = 256 - 256 % PWA.length; let o = ''; while (o.length < n) for (const b of crypto.getRandomValues(new Uint8Array(n * 2))) if (b < lim && o.length < n) o += PWA[b % PWA.length]; return o; };
+
 // ค่าตั้ง/ผู้ใช้/รายการเก็บ offline
 export const pref = (k, v) => (v === undefined ? ls.get('pms.' + k) : ls.set('pms.' + k, v));
 export const isOffline = (id, dflt) => { const s = ls.get('pms.offline') || {}; return id in s ? s[id] : dflt; };

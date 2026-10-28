@@ -79,6 +79,7 @@ function resolve() {
     const c = rest[0] === 'k' && S.cats.find(x => x.id === rest[1]); if (c) st.push({ id: 's-kind', arg: c.id, title: c.name });
   } else if (t === 'me') {
     if (rest[0] === 'sarabun') st.push({ id: 's-sarabun', title: 'เชื่อมสารบรรณ' });
+    else if (rest[0] === 'users' && S.user && S.user.is_admin) st.push({ id: 's-users', title: 'ผู้ใช้' });   // เฉพาะแอดมิน (เซิร์ฟเวอร์ตรวจซ้ำ)
   } else if (t === 'pm') {
     if (rest[0] === 'pick' || rest[0] === 'new') {   // #/pm/pick[/<แถว>] = เลือกจากตาราง › เปิดงาน · #/pm/new/<แถว> = เปิดงานตรง
       if (rest[0] === 'pick') st.push({ id: 's-pick', title: 'เลือกงาน' });
@@ -93,6 +94,7 @@ function resolve() {
       }
     }
   }
+  if (!st.some(c => c.id === 's-users')) S.users = null;   // ออกจากหน้าผู้ใช้ = ล้าง (เข้าใหม่โหลดใหม่)
   const found = doc && (S.docs.find(d => d.id === doc) || S.files.find(d => d.id === doc) || S.templates.find(x => x.code === doc));
   if (found) st.push({ id: 's-view', arg: doc, title: F.fmtTitle(found.title) || found.code });
   return { tab: t, chain: [{ id: 's-' + t, title: TITLES[t] }, ...st] };
@@ -105,6 +107,7 @@ function paint(c, i) {
   el.dataset.k = key; el.dataset.a = a; el.scrollTop = y; el.classList.toggle('sc', y > tok('collapse-y'));
   if (c.id === 's-fill') stripScroll(fresh, x);
   if (c.id === 's-sarabun') bmFill(el);
+  if (c.id === 's-users' && !S.users) { S.users = { st: 'load' }; fetchUsers(); }
   if (c.id === 's-view') signView(el, c.arg);
 }
 function draw() {
@@ -157,11 +160,13 @@ function openSheet(kind, id, html) {
   opener = document.activeElement; const sh = $('#sheet');
   sh.innerHTML = html ?? V.sheet(S, kind, id); M.sync(sh); sh.classList.add('open'); $('#bd').classList.add('open');
   bg().forEach(c => c.inert = true); sh.setAttribute('tabindex', '-1'); $('.sh-h button', sh).focus();
+  if (kind === 'ureset') $('#uPw', sh).value = store.genPassword();   // รีเซ็ต: ใส่รหัสสุ่มให้เลย (แก้เองหรือกดสุ่มใหม่ได้)
 }
 function closeSheet() {
   if (!$('.sheet.open')) return;
   $$('.sheet.open,.bd.open').forEach(x => x.classList.remove('open')); bg().forEach(c => { c.inert = false; });
   if (opener && opener.isConnected) opener.focus(); opener = null;
+  if ($('#tmpPw')) setTimeout(() => { if (!$('.sheet.open')) $('#sheet').innerHTML = ''; }, 500);   // รหัสชั่วคราวห้ามค้างใน DOM หลังปิด
 }
 function toast(text, icon = 'info', fn = null, ms = tok('toast-ms')) {
   const x = $('#toast'); $('span', x).textContent = text; $('use', x).setAttribute('href', `./ui/icons.svg#i-${icon}`);
@@ -327,12 +332,13 @@ function ctaGo() {
 
 // ---------- เหตุการณ์ ----------
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-dl-ed],[data-retry],[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-spot],[data-vo],[data-ex],[data-sopen],[data-sx],[data-more],[data-site],[data-eng],[data-eng-other],[data-travel],[data-offrd],[data-use-imp],[data-open-draft],[data-sim040],[data-chk],[data-confirm-form],[data-form-done],[data-assign],[data-file-del],[data-val-edit],[data-val-save],[data-val-ok],[data-evt],#cta,[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],[data-impjob],[data-imp-save],[data-bm-link],[data-bm-copy],#bd');
+  const t = e.target.closest('[data-dl-ed],[data-retry],[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-u-gen],[data-u-add],[data-u-reset],[data-u-set],[data-u-copy],[data-pre],[data-spot],[data-vo],[data-ex],[data-sopen],[data-sx],[data-more],[data-site],[data-eng],[data-eng-other],[data-travel],[data-offrd],[data-use-imp],[data-open-draft],[data-sim040],[data-chk],[data-confirm-form],[data-form-done],[data-assign],[data-file-del],[data-val-edit],[data-val-save],[data-val-ok],[data-evt],#cta,[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],[data-impjob],[data-imp-save],[data-bm-link],[data-bm-copy],#bd');
   if (!t) return; const d = t.dataset;
   if (d.pre) { const [k, v] = d.pre.split(':'); S.ui[k] = v; S.rev++; }
   if ('vo' in d) { S.ui.vo = !t.parentNode.open; return; }
   if (d.spot) S.ui.spot = d.spot;   // แตะแคปซูลในหน้าวันนี้ → ไปหน้างานแล้วเลื่อนไปจุดที่ติด
   if (t.id === 'cta') ctaGo();
+  else if (d.retry === 'users') { S.users = { st: 'load' }; S.rev++; draw(); fetchUsers(); }
   else if ('retry' in d) { if (d.retry.startsWith('file:')) { delete S.urls[d.retry.slice(5)]; S.rev++; draw(); } else refresh(d.retry.split(',')); }   // การ์ดโหลดไม่สำเร็จ → โหลดเฉพาะชุดนั้นใหม่
   else if ('ex' in d) { S.job.example = d.ex; save(); closeSheet(); S.rev++; draw(); toast('เปลี่ยนตัวอย่างแล้ว', 'ok'); }
   else if ('sopen' in d) { const n = t.closest('.nav'); n.classList.add('so'); $('input', n).focus(); }
@@ -357,6 +363,11 @@ document.addEventListener('click', e => {
   else if ('valOk' in d) { const [sc, k] = d.valOk.split(/:(.+)/); valOk(sc, k); }
   else if ('peek' in d) { const i = $('input', t.parentNode), on = i.type === 'password'; i.type = on ? 'text' : 'password'; t.setAttribute('aria-pressed', on); t.setAttribute('aria-label', on ? 'Hide password' : 'Show password'); $('use', t).setAttribute('href', `./ui/icons.svg#i-${on ? 'eyeoff' : 'eye'}`); }
   else if ('pwSave' in d) savePassword();
+  else if ('uGen' in d) $('#uPw').value = store.genPassword();
+  else if ('uAdd' in d) addUser();
+  else if (d.uReset) resetUser(d.uReset);
+  else if (d.uSet) { const [id, on] = d.uSet.split(/:(.+)/); setUser(id, on === '1'); }
+  else if ('uCopy' in d) copyPw();
   else if ('recheck' in d) finishLogin(true);
   else if (d.be) { store.setBackend(d.be); store.pref('user', null); location.reload(); }   // เปลี่ยน backend = ล็อกอินใหม่
   else if ('back' in d) { e.preventDefault(); pop(); }
@@ -440,7 +451,7 @@ async function finishLogin(recheck = false) {
   try {
     const raw = $('#email').value.trim(), pwRaw = $('#pass').value;
     if (!recheck && (!raw || !pwRaw)) return loginErr(LOGIN_ERR.auth);   // ทั้ง demo และจริง: ต้องกรอกทั้งคู่
-    let u = { name: 'สมหมาย', email: raw };
+    let u = { name: 'สมหมาย', email: raw, id: 'demo-admin', is_admin: true };   // demo: เห็นหน้าผู้ใช้ได้ (ข้อมูลจำลอง)
     if (real()) {
       if (notReady()) return loginErr(LOGIN_ERR.server);
       const em = raw.includes('@') ? raw : raw + '@aerothai.co.th', pw = pwRaw;   // พิมพ์ sommai.sa = sommai.sa@aerothai.co.th
@@ -449,7 +460,7 @@ async function finishLogin(recheck = false) {
         if (!recheck) { await a.signIn(em, pw); $('#pass').value = ''; $('#pass').type = 'password'; }   // ไม่ให้รหัสผ่านค้างในช่อง
         const p = await a.me(); $('#s-login').classList.toggle('wait', !p.approved);
         if (!p.approved) return;
-        u = { name: p.name || p.email, email: p.email, id: p.id }; S.user = u; await load();
+        u = { name: p.name || p.email, email: p.email, id: p.id, is_admin: p.is_admin === true }; S.user = u; await load();
       } catch (e) { $('#pass').value = ''; return loginErr(e.code === 'auth' ? LOGIN_ERR.auth : e.code === 'offline' ? LOGIN_ERR.offline : 'Something went wrong. Try again.'); }
     }
     enter(u);
@@ -468,6 +479,43 @@ async function savePassword() {
   say('');
   try { await store.auth().changePassword(a); } catch (e) { return say(e.code === 'invalid' ? 'รหัสผ่านนี้ใช้ไม่ได้ ลองตั้งใหม่' : errWord(e)); }
   closeSheet(); toast('เปลี่ยนรหัสผ่านแล้ว', 'ok');
+}
+
+// ---------- ผู้ใช้ (แอดมิน) ----------
+const UERR = { exists: 'ชื่อผู้ใช้นี้มีอยู่แล้ว', forbidden: 'บัญชีนี้ไม่มีสิทธิ์แอดมิน', notdeployed: 'ยังไม่ได้ตั้งค่าบนเซิร์ฟเวอร์ · ดู backend/edge/README.md',
+  username: 'ชื่อผู้ใช้ใช้ได้เฉพาะ a-z 0-9 . _ - ยาว 3-40 ตัว', name: 'กรอกชื่อ-นามสกุล', password: 'รหัสผ่านต้องยาวอย่างน้อย 10 ตัว' };
+const uerr = e => UERR[e.field] || UERR[e.code] || errWord(e);
+let ubusy = false;
+async function fetchUsers() {
+  const mine = S.users;
+  try { const r = await store.adminUsers('list'); if (S.users === mine) S.users = { st: 'ok', rows: r.users }; }
+  catch (e) { if (S.users === mine) S.users = e.code === 'notdeployed' ? { st: 'nd' } : { st: 'err', e }; }
+  S.rev++; draw();
+}
+// ทำคำสั่งผู้ใช้ 1 ครั้ง (กันกดซ้ำ) · ผิด = say(ข้อความ) ในช่องผิดพลาดของ sheet (ถ้ามี) ไม่งั้น toast
+async function userCmd(action, body, say = t => toast(t, 'warn')) {
+  if (ubusy) return null; ubusy = true;
+  try { return await store.adminUsers(action, body) || {}; } catch (e) { say(uerr(e)); return null; } finally { ubusy = false; }
+}
+const uSay = t => { const x = $('#uErr'); if (!x) return t && toast(t, 'warn'); x.hidden = !t; $('span', x).textContent = t || ''; };
+function showPw(username, pw) { closeSheet(); openSheet('newpw', null, V.newPwSheet(username, pw)); }
+async function addUser() {
+  const username = $('#uUser').value.trim().toLowerCase(), name = $('#uName').value.trim(), password = $('#uPw').value; uSay('');
+  if (!await userCmd('create', { username, name, password }, uSay)) return;
+  showPw(username, password); S.users = { st: 'load' }; fetchUsers();
+}
+async function resetUser(id) {
+  const password = $('#uPw').value, u = (S.users.rows || []).find(x => x.id === id); uSay('');
+  if (!await userCmd('reset', { id, password }, uSay)) return;
+  showPw(u ? u.username : '', password);
+}
+async function setUser(id, approved) {
+  if (!await userCmd('set', { id, approved })) return;
+  const u = S.users.rows.find(x => x.id === id); if (u) u.approved = approved; S.rev++; draw(); toast(approved ? 'เปิดการใช้งานแล้ว' : 'ปิดการใช้งานแล้ว', 'ok');
+}
+async function copyPw() {
+  const t = $('#tmpPw').textContent;
+  try { await navigator.clipboard.writeText(t); toast('คัดลอกรหัสแล้ว', 'ok'); } catch { const r = document.createRange(); r.selectNodeContents($('#tmpPw')); getSelection().removeAllRanges(); getSelection().addRange(r); toast('เลือกรหัสแล้ว กดคัดลอกเอง', 'info'); }
 }
 
 // ---------- สารบรรณ: ติดตั้งปุ่ม + รับข้อมูลที่นำเข้า ----------
@@ -509,6 +557,7 @@ M.init(app);
   const u = store.pref('user'); S.user = u || { name: 'สมหมาย' }; app.classList.toggle('login', !u);
   $('#lgDemo')?.toggleAttribute('hidden', real());   // ป้าย demo เฉพาะโหมดตัวอย่าง · ?. กัน index.html เก่าจาก HTTP cache
   if (u && real() && !u.id) { try { u.id = JSON.parse(localStorage.getItem('pms.session')).user.id; } catch {} }   // ผู้ใช้ที่ล็อกอินก่อนรุ่นนี้: เติม id จาก session (ใช้แยกรายงานของฉัน)
+  if (u && real() && u.is_admin === undefined) { try { u.is_admin = (await store.auth().me()).is_admin === true; store.pref('user', u); } catch { u.is_admin = false; } }   // ผู้ใช้ที่ล็อกอินก่อนรุ่นนี้: อ่านสิทธิ์จาก profiles (แค่ซ่อน/แสดงเมนู · เซิร์ฟเวอร์ตรวจจริง)
   let ok = false;   // ยังไม่มีข้อมูล (ยังไม่ล็อกอิน/โหลดไม่ได้) = ไม่วาดหน้าจอ ไม่งั้นพัง
   if (u || !real()) { try { await load(); ok = true; } catch (e) { if (e.code === 'auth') { store.pref('user', null); app.classList.add('login'); } toast(errWord(e), 'warn'); } }
   migrate(); if (ok) draw();
