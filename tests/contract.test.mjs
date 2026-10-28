@@ -66,4 +66,9 @@ globalThis.fetch = async (u, o) => new URL(u).pathname === '/rest/v1/jobs' ? jso
 const e = await store.listJobs().catch(x => x);
 ok(e.code === 'server' && e.status === 400 && e.path === '/rest/v1/jobs' && /relationship/.test(e.detail) && !JSON.stringify(e).includes('"T"'), 'error มี path/status/detail · ไม่มี token');
 
+// ไม่มี session (เช่น refresh ถูกปฏิเสธแล้ว pms.user ยังค้าง) = auth ไม่ใช่ [] เงียบ
+localStorage.removeItem('pms.session'); let hit = 0; globalThis.fetch = async (u, o) => { hit++; return fakeFetch(u, o); };
+const na = await store.listJobs().catch(x => x);
+ok(na.code === 'auth' && hit === 0, 'ไม่มี session → auth (ไม่ยิง anon)');
+
 console.log(`\n${n} ข้อ · ${process.exitCode ? 'มีข้อไม่ผ่าน' : 'ผ่านทั้งหมด'}`);

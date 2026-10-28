@@ -16,6 +16,7 @@ async function call(path, { method = 'GET', body, headers = {}, auth = true, raw
   if (!CONFIG.supabaseUrl || !CONFIG.anonKey) fail('server');
   if (navigator.onLine === false) fail('offline');
   let s = session();
+  if (auth && !s) fail('auth', 0, { path: path.split('?')[0] });   // ไม่มี session = ล็อกอินใหม่ · ห้ามยิงแบบ anon (RLS คืน [] เงียบ หน้าว่างแทนหน้าล็อกอิน)
   if (auth && s && s.expires_at * 1000 < Date.now() + 30000) s = await refresh();
   const h = { apikey: CONFIG.anonKey, ...((auth && s && s.access_token) ? { Authorization: `Bearer ${s.access_token}` } : {}), ...headers };   // publishable key ส่งเฉพาะ apikey · Bearer เฉพาะเมื่อมี token ผู้ใช้
   if (body !== undefined && !(body instanceof Blob)) { h['Content-Type'] = 'application/json'; body = JSON.stringify(body); }
