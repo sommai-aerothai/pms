@@ -4,8 +4,9 @@ import * as V from './views.js';
 import { initGestures } from './gestures.js';
 import * as photos from './photos.js';
 import { tok } from './tok.js';
+import { CONFIG } from './config.js';
 
-const VERSION = 'v0.3';
+const VERSION = 'v0.4';
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const app = $('#app'), TABS = ['today', 'pm', 'reports', 'docs', 'me'];
 const TITLES = { today: 'วันนี้', pm: 'งาน PM', reports: 'รายงาน', docs: 'เอกสาร', me: 'ฉัน' };
@@ -23,7 +24,7 @@ const photoIds = () => S.jobs.flatMap(j => [...(j.tx || []).flatMap(t => Object.
 async function loadPhotos() {
   for (const id of photoIds()) if (!S.ph[id]) { try { const b = await photos.get(id); if (b) S.ph[id] = URL.createObjectURL(b); } catch { /* IndexedDB ใช้ไม่ได้ → ไม่มี thumbnail */ } }
 }
-const errWord = e => ({ auth: 'ต้องเข้าสู่ระบบใหม่', offline: 'ออฟไลน์อยู่', notfound: 'ไม่พบข้อมูล', throttled: 'ระบบยุ่ง ลองใหม่อีกครั้ง' }[e.code] || 'เกิดข้อผิดพลาด');
+const errWord = e => ({ auth: 'ต้องเข้าสู่ระบบใหม่', server: 'เซิร์ฟเวอร์มีปัญหา ลองใหม่อีกครั้ง', conflict: 'มีคนแก้งานนี้ก่อน โหลดใหม่แล้วลองอีกครั้ง', offline: 'ออฟไลน์อยู่', notfound: 'ไม่พบข้อมูล', throttled: 'ระบบยุ่ง ลองใหม่อีกครั้ง' }[e.code] || 'เกิดข้อผิดพลาด');
 async function refresh() {
   try { [S.docs, S.templates, S.cats] = [(await store.listDocs()).items, await store.listTemplates(), await store.getFiles()]; S.files = S.cats.flatMap(c => c.rows); S.rev++; draw(); toast('รีเฟรชแล้ว', 'ok'); }
   catch (e) { toast(errWord(e), 'warn'); }
@@ -185,13 +186,15 @@ async function createJob() {
 
 // ---------- เหตุการณ์ ----------
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-start],[data-sys],[data-create],[data-share],[data-resend],[data-file],[data-photo-del],[data-sel],#bd');
+  const t = e.target.closest('[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-pre],[data-start],[data-sys],[data-create],[data-share],[data-resend],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],#bd');
   if (!t) return; const d = t.dataset;
   if (d.pre) { const [k, v] = d.pre.split(':'); if (k === 'cur') { const jb = S.jobs.find(x => x.id === d.pre.split(':')[2]); if (jb) { jb.cur = +v; if (jb === S.job) sched(); else store.putJob(jb); } } else S.ui[k] = v; S.rev++; }
   if (d.start) { const jb = S.jobs.find(x => x.id === d.start); jb.status = 'doing'; jb.touched = new Date().toISOString(); store.putJob(jb); S.rev++; draw(); toast('เริ่มงานแล้ว', 'ok'); }
   else if (d.sys) { $$('[data-sys]').forEach(b => b.setAttribute('aria-checked', b === t)); }
   else if ('create' in d) createJob();
-  else if ('resend' in d) { e.preventDefault(); toast('Code sent again (demo)', 'ok'); }
+  else if ('resend' in d) { e.preventDefault(); if (real() && !notReady()) store.auth().requestOtp($('#email').value.trim()).then(() => toast('ส่งรหัสอีกครั้งแล้ว', 'ok'), x => toast(errWord(x), 'warn')); else toast(notReady() ? 'ยังไม่ได้ตั้งค่าเซิร์ฟเวอร์' : 'Code sent again (demo)', notReady() ? 'warn' : 'ok'); }
+  else if ('recheck' in d) finishLogin(true);
+  else if (d.be) { store.setBackend(d.be); store.pref('user', null); location.reload(); }   // เปลี่ยน backend = ล็อกอินใหม่
   else if ('back' in d) { e.preventDefault(); pop(); }
   else if (t.closest('.tabbar')) { e.preventDefault(); const n = TABS[$$('.tabbar a').indexOf(t)]; if (t.closest('.mini')) $('.tabbar').classList.remove('mini'); else go(n === tab ? '#/' + n : lastHash[n] || '#/' + n); }
   else if (d.sheet) { const [k, id] = d.sheet.split(':'); openSheet(k, id); }
@@ -252,12 +255,32 @@ app.addEventListener('scroll', e => {
 
 // ---------- ล็อกอิน (อังกฤษ · ตัวอย่าง): อีเมลบริษัท → รหัส 6 หลัก · demo รับเลข 6 หลักอะไรก็ได้ ----------
 const boxes = () => $$('#codeBoxes input');
-function sendCode() {
+const real = () => store.backendName() !== 'demo';
+const notReady = () => real() && !(CONFIG.supabaseUrl && CONFIG.anonKey);
+async function sendCode() {
   const m = $('#email'); if (!m.value.trim() || !m.checkValidity()) { m.reportValidity(); return; }
+  if (notReady()) return toast('ยังไม่ได้ตั้งค่าเซิร์ฟเวอร์', 'warn');
+  if (real()) { try { await store.auth().requestOtp(m.value.trim()); } catch (e) { return toast(errWord(e), 'warn'); } }
   $('#s-login').classList.add('code'); $('#sentTo').textContent = m.value.trim(); boxes()[0].focus();
 }
-function finishLogin() {
-  const u = { name: 'สมหมาย', email: $('#email').value.trim() };
+let busy = false;
+async function finishLogin(recheck = false) {
+  if (busy) return; busy = true;
+  try {
+    let u = { name: 'สมหมาย', email: $('#email').value.trim() };
+    if (real()) {
+      try {
+        const em = $('#email').value.trim(), a = store.auth();
+        if (!recheck) await a.verifyOtp(em, boxes().map(x => x.value).join(''));
+        const p = await a.me(); $('#s-login').classList.toggle('wait', !p.approved);
+        if (!p.approved) return;
+        u = { name: p.name || p.email, email: p.email }; await load();
+      } catch (e) { boxes().forEach(x => { x.value = ''; }); boxes()[0].focus(); return toast(e.code === 'auth' ? 'รหัสไม่ถูกหรือหมดอายุ' : errWord(e), 'warn'); }
+    }
+    enter(u);
+  } finally { busy = false; }
+}
+function enter(u) {
   store.pref('user', u); S.user = u; app.classList.remove('login'); S.rev++; location.hash.length > 2 ? draw() : go('#/today');
 }
 // ใส่ตัวเลขหลายตัวตั้งแต่ช่อง n (วาง / autofill "จากข้อความ") → ช่องถัดไปที่ว่าง หรือส่งเมื่อครบ 6
@@ -282,7 +305,9 @@ addEventListener('hashchange', () => { migrate(); closeSheet(); draw(); });
 initGestures({ app, depth: () => chain.length - 1, top: () => $('#' + chain[chain.length - 1].id), parent: () => $('#' + chain[chain.length - 2].id), pop, closeSheet, setM: n => setM(n, true), cur: () => S.job.cur, refresh, isPad: () => pad.matches });
 (async () => {
   const u = store.pref('user'); S.user = u || { name: 'สมหมาย' }; app.classList.toggle('login', !u);
-  await load(); migrate(); draw();
+  let ok = false;   // ยังไม่มีข้อมูล (ยังไม่ล็อกอิน/โหลดไม่ได้) = ไม่วาดหน้าจอ ไม่งั้นพัง
+  if (u || !real()) { try { await load(); ok = true; } catch (e) { if (e.code === 'auth') { store.pref('user', null); app.classList.add('login'); } toast(errWord(e), 'warn'); } }
+  migrate(); if (ok) draw();
 })();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   const ready = w => toast('มีเวอร์ชันใหม่ แตะเพื่อโหลด', 'sync', () => w.postMessage('skip'), 0);
