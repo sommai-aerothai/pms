@@ -13,10 +13,12 @@ export const addMonth = (ym, n) => { const [y, m] = ym.split('-').map(Number), t
 export const fiscal = iso => { const y = +iso.slice(0, 4), m = +iso.slice(5, 7); return { fy: y + 543 + (m >= 10 ? 1 : 0), round: m >= 10 || m <= 3 ? 1 : 2 }; };
 
 // ---------- ตาราง PM ----------
+// ชื่องานรูปแบบเดียวทั้งแอป: "<ระบบ> (<สถานที่>) <รอบ>/<ปี>" — ตัดคำนำ "PM " และ "ครั้งที่"
+export const fmtTitle = t => String(t ?? '').replace(/^PM\s+/, '').replace(/\s*ครั้งที่\s*/g, ' ').trim();
 export const rowTitle = r => r.rotate ? r.job : `${r.job} ${r.round}/${String(ORDER.fy).slice(2)}`;
 export const rowBase = r => r.job.replace(/\s*\(.*?\)\s*/g, ' ').trim();   // ตัดวงเล็บ (จุด/ชั้น) ไว้จับคู่ชื่อระบบ
 export const sysFor = (title, systems) => ((systems || []).filter(s => title.startsWith(s.name)).sort((a, b) => b.name.length - a.name.length)[0] || {}).id || '';
-export const navTitle = j => j.pm && j.pm.base && !j.pm.off ? `${rowBase({ job: j.pm.base })} ${j.round}` : j.title;
+export const navTitle = j => fmtTitle(j.title);
 export const rowDur = r => r.days ? `${r.days} วัน` : r.range || '';
 // รายการตารางที่ยังไม่เปิด จัดกลุ่ม เดือนนี้ / เดือนหน้า / ทั้งปี (today = YYYY-MM-DD) · ของฉัน (me) ขึ้นก่อนในกลุ่ม
 export function scheduleGroups(rows, opened, today, me = '') {
@@ -80,7 +82,7 @@ export function formProg(j, f) {
     const tx = j.tx || [], fl = j.fields || [], total = tx.length * fl.length;
     if (!total) return { done: 0, total: 0, text: 'ยังไม่มีไฟล์ · กรอกเอง', sub: '' };
     let filled = 0, pend = 0; tx.forEach(t => fl.forEach(x => { if (String(t.v[x.k] ?? '').trim() !== '') { filled++; if (t.pend && t.pend[x.k]) pend++; } }));
-    return { done: filled - pend, total, filled, pend, text: `เติมจากไฟล์ ${j.fileFilled || 0}/${total} · เหลือกรอกเอง ${total - filled}`, sub: pend ? `รอยืนยัน ${pend} ช่อง` : '' };
+    return { done: filled - pend, total, filled, pend, text: j.fileFilled > 0 ? `เติมจากไฟล์ ${j.fileFilled}/${total} · เหลือกรอกเอง ${total - filled}` : filled ? `กรอกแล้ว ${filled} จาก ${total} ช่อง` : 'ยังไม่ได้ทำ', sub: pend ? `รอยืนยัน ${pend} ช่อง` : '' };
   }
   if (f.kind === 'asset' && (j.assetCheck || []).length) { const n = j.assetCheck.length, k = assetOk(j); return { done: k, total: n, text: k === n ? 'ตรงทะเบียนครบ' : `ตรวจแล้ว ${k}/${n} รายการ`, sub: '' }; }
   if (f.pend) return { done: 0, total: 1, pend: f.pend, text: `อ่านจากไฟล์ ${f.pend} ค่า · รอยืนยัน`, sub: f.fileName ? `ไฟล์ ${f.fileName}` : '' };

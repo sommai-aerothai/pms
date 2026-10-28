@@ -71,14 +71,14 @@ function resolve() {
       const j = S.jobs.find(x => x.id === rest[0]);
       if (j) {
         if (saveT && S.job !== j) save();   // ยังมีค่าค้างบันทึกของงานก่อนหน้า → บันทึกก่อนสลับ
-        S.job = j; st.push({ id: 's-job', arg: j.id, title: j.title });
+        S.job = j; st.push({ id: 's-job', arg: j.id, title: F.fmtTitle(j.title) });
         const m = { fill: [pad.matches ? 's-table' : 's-fill', 'เครื่องส่ง'], table: [pad.matches ? 's-table' : 's-fill', 'เครื่องส่ง'], asset: ['s-asset', 'ทะเบียนอุปกรณ์'], tools: ['s-tools', 'เครื่องมือวัด'] }[rest[1]];
         if (m && (m[0] !== 's-table' && m[0] !== 's-fill' || j.tx)) st.push({ id: m[0], arg: j.id, title: m[1] });
       }
     }
   }
   const found = doc && (S.docs.find(d => d.id === doc) || S.files.find(d => d.id === doc) || S.templates.find(x => x.code === doc));
-  if (found) st.push({ id: 's-view', arg: doc, title: found.title || found.code });
+  if (found) st.push({ id: 's-view', arg: doc, title: F.fmtTitle(found.title) || found.code });
   return { tab: t, chain: [{ id: 's-' + t, title: TITLES[t] }, ...st] };
 }
 function paint(c, i) {
