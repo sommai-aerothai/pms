@@ -40,74 +40,117 @@ export const formsDone = j => j.forms.filter(f => formState(j, f)[0]).length;
 const expired = j => j.tools.filter(t => Date.parse(t.due) < Date.now());
 const sysName = (S, id) => (S.catalog.systems.find(s => s.id === id) || {}).name || id;
 
-// ---------- หน้าหลัก ----------
-export function home(S) {
-  const j = S.job, ex = expired(j), wi = store.isOffline('WI-CE.SE-02', true);
-  const rows = [[1, 'ฟอร์ม Rev ล่าสุด · พร้อม'], [!ex.length, ex.length ? `เครื่องมือ calibration · ${ex[0].name} หมด ${dShort(ex[0].due)}` : 'เครื่องมือ calibration · ไม่หมดอายุ'],
-    [wi, wi ? 'WI ตั้งเก็บ offline (ตัวอย่าง)' : 'WI ยังไม่ได้ตั้งเก็บ offline'], [j.letter, j.letter ? 'หนังสือคำสั่ง · ครบ' : 'หนังสือคำสั่ง · ยังไม่มี']]
-    .map(([ok, t]) => `<div class="srow">${st(ok ? 'ok' : 'warn', t)}</div>`).join('');
-  const rem = [...ex.map(t => `<a class="row" href="#/pm/tools">${ic('warn', 'lead w')}<span class="rt"><span>เครื่องมือต้อง calibrate</span><span class="sub">${esc(t.name)} หมดอายุ ${dFull(t.due)}</span></span>${chev}</a>`),
-    ...S.templates.filter(t => t.isNew).map(t => `<a class="row" href="#/man">${ic('doc', 'lead')}<span class="rt"><span>${t.code} Rev.${t.rev} <span class="bdg">ใหม่</span></span><span class="sub">แก้ไขจาก Rev.${t.prev} · ${dShort(t.changed)}</span></span>${chev}</a>`)].join('');
-  const recent = S.recent.map(([id, at]) => S.docs.find(d => d.id === id) && [S.docs.find(d => d.id === id), at]).filter(Boolean)
-    .map(([d, at]) => `<a class="row" href="#/home/doc/${d.id}">${ic('doc', 'lead')}<span class="rt"><span>${esc(d.title)}</span><span class="sub">เปิด${/วัน|เมื่อ/.test(when(at)) ? '' : ' '}${when(at)} · ${d.pages} หน้า</span></span>${chev}</a>`).join('');
-  return `${nav('หน้าหลัก')}<div class="in"><h1 class="lt">สวัสดี ${esc(S.user.name)}</h1>
- <div class="grp"><div class="p16"><div class="cap">งานถัดไป</div><div class="big">${esc(j.title.replace(/ (\d+\/\d+)$/, ' · ครั้งที่ $1'))}</div><div class="sec">${dRange(j.dates)}</div></div>${rows}
-  <div class="p16"><a class="btn" href="#/pm">เริ่มงาน</a></div></div>
- ${rem ? `<div class="sh">เตือน</div><div class="grp">${rem}</div>` : ''}
- <div class="sh">ล่าสุด</div><div class="grp">${recent || '<div class="empty">ยังไม่เคยเปิดรายงาน</div>'}</div></div>`;
+// ---------- วันนี้ ----------
+const bkk = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());   // YYYY-MM-DD ตามเวลาไทย
+const DAYS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+const act = (href, label, pre = '') => `<a class="btn" href="${href}"${pre ? ` data-pre="${pre}"` : ''}>${label}</a>`;
+// งานที่แตะล่าสุดในกลุ่ม "กำลังทำ" (touched อัปเดตทุกครั้งที่บันทึก)
+export const recent = S => S.jobs.filter(j => j.status === 'doing').sort((a, b) => b.touched.localeCompare(a.touched))[0];
+export function today(S) {
+  const j = recent(S), prev = S.docs.find(d => d.id === 'tx-stby-2569-2-69'), base = j && `#/pm/${j.id}`;
+  const tx = j && j.tx, ft = tx && tx.find(t => !txDone(j, t)), loc = j && (S.catalog.systems.find(x => x.id === j.system) || {}).loc || '';
+  const [k, n] = ft ? [txDoneCount(j), tx.length] : j ? [formsDone(j), j.forms.length] : [0, 1];
+  const doing = j
+    ? `<div class="p16"><div class="big">${esc(j.title)}</div><div class="sec">${[loc, dRange(j.dates)].filter(Boolean).join(' · ')}</div>
+   <div class="mt3"><b>${ft ? 'เครื่องส่ง' : 'ฟอร์ม'} ${k}/${n}</b></div><div class="bar2"><i style="width:${100 * k / n}%"></i></div>${st('todo', 'กำลังทำ')}
+   <div class="mt3">${ft ? act(base + '/fill', 'ทำต่อ', `cur:${ft.n}:${j.id}`) : act(base, 'ทำต่อ')}</div></div>`
+    : `<div class="p16"><div class="big">ยังไม่มีงานที่เริ่ม</div><div class="sec">เลือกงานหรือเริ่มงานใหม่ในหน้างาน PM</div><div class="mt3">${act('#/pm', 'ไปที่งาน PM')}</div></div>`;
+  const blk = [...(j ? (j.tools || []).filter(t => Date.parse(t.due) < Date.now()).map(t => [st('warn', `เครื่องมือหมดอายุ · ${t.name}`), base + '/tools']) : []),
+    ...S.templates.filter(t => t.isNew).map(t => [st('todo', `ฟอร์ม ${t.code} Rev.${t.rev} ใหม่ ยังไม่โหลด`), `#/today/doc/${t.code}`])];
+  const chk = blk.length ? `${blk.map(x => `<div class="srow">${x[0]}</div>`).join('')}<div class="p16">${act(blk[0][1], 'ตรวจรายการ')}</div>` : `<div class="srow">${st('ok', 'พร้อมทำงาน')}</div>`;
+  const nt = ft && (tx.find(t => !txDone(j, t) && t.n !== ft.n) || ft);
+  const nxt = !j
+    ? `<div class="p16"><div class="big">เปิดรายงานรอบก่อน</div><div class="sec">${esc(prev.title)} · ดูตัวอย่างก่อนเริ่มงาน</div><div class="mt3">${act('#/today/doc/' + prev.id, 'ไปขั้นถัดไป')}</div></div>`
+    : !tx ? `<div class="p16"><div class="big">ทำฟอร์มที่เหลือ</div><div class="sec">ยังไม่เสร็จ ${j.forms.length - k} ฟอร์ม</div><div class="mt3">${act(base, 'ไปขั้นถัดไป')}</div></div>`
+    : `<div class="p16">${ft ? `<div class="big">กรอกค่าเครื่องส่ง ${nt.n}</div><div class="sec">แล้วจึงตรวจเลขทรัพย์สิน · หลังกรอกครบ</div><div class="mt3">${act(base + '/fill', 'ไปขั้นถัดไป', `cur:${nt.n}:${j.id}`)}</div>` : `<div class="big">ตรวจเลขทรัพย์สิน</div><div class="sec">ค่าเครื่องส่งครบแล้ว</div><div class="mt3">${act(base + '/asset', 'ไปขั้นถัดไป')}</div>`}</div>`;
+  return `${nav('วันนี้')}<div class="in today"><h1 class="lt">วันนี้</h1>
+ <p class="sec note">สวัสดี ${esc(S.user.name)} · ${DAYS[new Date(bkk() + 'T00:00:00Z').getUTCDay()]} ${dShort(bkk())}</p>
+ <div class="sh">กำลังทำ</div><div class="grp">${doing}</div>
+ <div class="sh">ต้องตรวจ</div><div class="grp">${chk}</div>
+ <div class="sh">ต่อไป</div><div class="grp">${nxt}</div></div>`;
 }
 
-// ---------- เอกสาร ----------
-const docRow = (S, d, base) => swr(`<a class="row" href="${base}/doc/${d.id}"><span class="rt"><span>${esc(d.title)}</span><span class="sub">${d.dates ? dRange(d.dates) + ' · ' : ''}${d.pages} หน้า · ผู้ปฏิบัติ ${d.crew} คน</span>${st(...DOC_ST[d.status])}</span>${chev}</a>`, d.id, isOff(S, d.id));
-export const isOff = (S, id) => { const t = S.templates.find(x => x.code === id); return store.isOffline(id, t ? t.offline !== false : false); };
+// ---------- รายงาน (ตัวอย่าง = ติดป้าย เพราะไม่ใช่ฉบับมาตรฐาน) ----------
+const BADGE = '<span class="bdg">ตัวอย่าง</span>';
+const docRow = (S, d, base) => swr(`<a class="row" href="${base}/doc/${d.id}"><span class="rt"><span>${esc(d.title)}</span><span class="sub">${d.dates ? dRange(d.dates) + ' · ' : ''}${d.pages} หน้า · ผู้ปฏิบัติ ${d.crew} คน</span><span class="stl">${st(...DOC_ST[d.status])}${BADGE}</span></span>${chev}</a>`, d.id, isOff(S, d.id));
+export const isOff = (S, id) => { const t = S.files.find(x => x.id === id) || S.templates.find(x => x.code === id); return store.isOffline(id, t ? t.offline !== false : false); };
 const roundsList = (S, list, base) => list.length ? list.map(d => docRow(S, d, base)).join('') : '<div class="empty">ไม่มีรายงานตัวอย่างในหมวดนี้</div>';
-export function docs(S) {
-  const u = S.ui, c = S.catalog, pane = u.p || 'p-sys', sel = u.sel || 'radio';
+export function reports(S) {
+  const u = S.ui, c = S.catalog, top = u.r || 'r-ex', pane = u.p || 'p-sys', sel = u.sel || 'tx-stby';
   const yr = {}; c.systems.forEach(s => (s.years || []).forEach(y => yr[y.year] = (yr[y.year] || 0) + y.count));
-  const row = (href, lead, t, v, x = '') => `<a class="row ${x}" href="${href}">${lead}<span class="rt">${esc(t)}</span><span class="rv">${v} รายงาน</span>${chev}</a>`;
-  const list = S.docs.filter(d => d.system === sel);
-  return `${nav('เอกสาร')}<div class="split"><div class="side">${ptr}<h1 class="lt">เอกสาร</h1>
+  const row = (href, lead, t, v, x = '', sub = '') => `<a class="row ${x}" href="${href}">${lead}<span class="rt"><span>${esc(t)}</span>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</span><span class="rv">${v} รายงาน</span>${chev}</a>`;
+  const list = S.docs.filter(d => d.system === sel), seg = (id, t, cur) => `<button data-pane="${id}" aria-pressed="${cur === id}">${t}</button>`;
+  return `${nav('รายงาน')}<div class="in">${ptr}<h1 class="lt">รายงาน</h1><div class="seg">${seg('r-ex', 'ตัวอย่าง', top)}${seg('r-out', 'ที่ออกจากแอป', top)}</div></div>
+ <div class="pane" id="r-ex" ${top === 'r-ex' ? '' : 'hidden'}><div class="split"><div class="side">
  <label class="search">${ic('search')}<input type="search" data-filter placeholder="ค้นหารายงาน" aria-label="ค้นหารายงาน"></label>
- <div class="seg"><button data-pane="p-sys" aria-pressed="${pane === 'p-sys'}">ระบบ</button><button data-pane="p-yr" aria-pressed="${pane === 'p-yr'}">ปี</button><button data-pane="p-stn" aria-pressed="${pane === 'p-stn'}">สถานี</button></div>
- <div class="pane" id="p-sys" ${pane === 'p-sys' ? '' : 'hidden'}><div class="grp">${c.systems.map(s => row(`#/docs/${s.id}`, ic(s.icon, 'lead'), s.name, s.count, s.id === sel ? 'sel' : '').replace('<a ', `<a data-sel="${s.id}" `)).join('')}</div></div>
- <div class="pane" id="p-yr" ${pane === 'p-yr' ? '' : 'hidden'}><div class="grp">${Object.keys(yr).sort((a, b) => b - a).map(y => row(`#/docs/by/yr/${y}`, '', y, yr[y])).join('')}</div></div>
- <div class="pane" id="p-stn" ${pane === 'p-stn' ? '' : 'hidden'}><div class="grp">${c.stations.map(s => row(`#/docs/by/stn/${s.id}`, '', s.name, s.count)).join('')}</div></div></div>
- <div class="detail"><h1 class="lt">${esc(sysName(S, sel))}</h1><div class="grp">${roundsList(S, list, '#/docs')}</div></div></div>`;
+ <div class="seg">${seg('p-sys', 'ระบบ', pane)}${seg('p-yr', 'ปี', pane)}</div>
+ <div class="pane" id="p-sys" ${pane === 'p-sys' ? '' : 'hidden'}><div class="grp">${c.systems.map(s => row(`#/reports/${s.id}`, ic(s.icon, 'lead'), s.name, s.count, s.id === sel ? 'sel' : '', s.loc).replace('<a ', `<a data-sel="${s.id}" `)).join('')}</div></div>
+ <div class="pane" id="p-yr" ${pane === 'p-yr' ? '' : 'hidden'}><div class="grp">${Object.keys(yr).sort((a, b) => b - a).map(y => row(`#/reports/by/yr/${y}`, '', y, yr[y])).join('')}</div></div></div>
+ <div class="detail"><h1 class="lt">${esc(sysName(S, sel))}</h1><div class="grp">${roundsList(S, list, '#/reports')}</div></div></div></div>
+ <div class="pane" id="r-out" ${top === 'r-out' ? '' : 'hidden'}><div class="empty">ยังไม่มีรายงานที่ออกจากแอป<div class="cap mt1">รายงานที่ออกจากแอปจะเก็บไว้ที่นี่และใช้เป็นตัวอย่างรอบถัดไป</div></div></div>`;
+}
+
+// ---------- เอกสารเว็บกอง: หมวด → ไฟล์ → ตัวดู ----------
+const fileRow = (S, f) => { const o = isOff(S, f.id);
+  return swr(`<a class="row" href="#/docs/k/${f.cat}/doc/${esc(f.id)}"><span class="rt"><span>${esc([f.code, f.title].filter(Boolean).join(' '))}</span><span class="sub">${[f.tag, f.rev && 'Rev.' + f.rev, 'ดึง ' + dShort(f.fetchedAt)].filter(Boolean).join(' · ')}</span>${o ? st('dl', 'ตั้งไว้ (ตัวอย่าง)') : st('cloud', 'ยังไม่ตั้ง')}</span>${chev}</a>`, f.id, o); };
+const filterBar = (ph, a = '') => `<label class="search">${ic('search')}<input type="search" data-filter${a} placeholder="${ph}" aria-label="${ph}"></label>`;
+export const searchFiles = (S, q) => { const r = S.files.filter(f => `${f.code} ${f.title} ${f.tag}`.toLowerCase().includes(q));
+  return r.length ? r.map(f => fileRow(S, f)).join('') : '<div class="empty">ไม่พบในไฟล์ตัวอย่าง</div>'; };
+export function docs(S) {
+  const at = S.cats[0].rows[0].fetchedAt;
+  return `${nav('เอกสาร')}<div class="in">${ptr}<h1 class="lt">เอกสาร</h1>${filterBar('ค้นหาเอกสาร (รหัสหรือชื่อ)', '="docs"')}
+ <div class="grp"><div class="kv"><span>จากเว็บกอง ${dShort(at)} ${hhmm(at)}</span>${st('ok', 'เป็นปัจจุบัน')}</div></div>
+ <div class="grp" id="dcats">${S.cats.map(c => `<a class="row" href="#/docs/k/${c.id}">${ic('folder', 'lead')}<span class="rt"><span>${esc(c.name)}</span></span><span class="rv">${c.total} ไฟล์</span>${chev}</a>`).join('')}</div>
+ <div class="grp" id="dres" hidden></div></div>`;
+}
+export function kind(S, id, back) {
+  const c = S.cats.find(x => x.id === id);
+  return `${nav(c.name, back)}<div class="in"><h1 class="lt">${esc(c.name)}</h1>${filterBar('ค้นหาในหมวดนี้')}
+ <p class="sec note">แสดงตัวอย่าง ${c.rows.length} จาก ${c.total} ไฟล์ · โหมดตัวอย่าง</p><div class="grp">${c.rows.map(f => fileRow(S, f)).join('')}</div></div>`;
 }
 export function years(S, sys, back) {
   const s = S.catalog.systems.find(x => x.id === sys) || {}, y = s.years || [];
   return `${nav(s.name, back, `<button data-toast="เรียงตามปีล่าสุดก่อน">${ic('sort')}เรียง</button>`)}<div class="in"><h1 class="lt">${esc(s.name)}</h1>
- <div class="grp">${y.map(x => `<a class="row" href="#/docs/${sys}/${x.year}"><span class="rt">${x.year}</span><span class="rv">${x.count} รายงาน</span>${chev}</a>`).join('')}</div></div>`;
+ <div class="grp">${y.map(x => `<a class="row" href="#/reports/${sys}/${x.year}"><span class="rt">${x.year}</span><span class="rv">${x.count} รายงาน</span>${chev}</a>`).join('')}</div></div>`;
 }
 export function rounds(S, arg, back) {
   const [sys, y, by, val] = arg;
-  const list = S.docs.filter(d => by ? (by === 'yr' ? d.year === +val : d.station === val || (val === 'dm' && d.station === 'dmrx')) : d.system === sys && d.year === +y);
-  const t = by === 'stn' ? (S.catalog.stations.find(s => s.id === val) || {}).name : String(by ? val : y);
-  return `${nav(t, back)}<div class="in"><h1 class="lt">${esc(t)}</h1><div class="grp">${roundsList(S, list, location.hash.split('/doc/')[0] || '#/docs')}</div></div>`;
+  const list = S.docs.filter(d => by ? d.year === +val : d.system === sys && d.year === +y);
+  const t = String(by ? val : y);
+  return `${nav(t, back)}<div class="in"><h1 class="lt">${esc(t)}</h1><div class="grp">${roundsList(S, list, location.hash.split('/doc/')[0] || '#/reports')}</div></div>`;
 }
 
 // ---------- ตัวดูรายงาน ----------
 export function view(S, id, back) {
-  const d = S.docs.find(x => x.id === id), t = S.templates.find(x => x.code === id);
-  const title = d ? d.title : `${t.code} Rev.${t.rev}`, pg = d ? d.pages : t.pages, code = d ? 'FM-CE.SE-006' : t.code;
-  const pages = Array.from({ length: Math.min(pg, 200) }, (_, i) => `<div class="page"><div class="hd"><i></i><span>${code}${i ? ` · แผ่นที่ ${i + 1}` : ''}</span></div><div class="ln"></div>${i ? '' : '<div class="ln s"></div>'}</div>`).join('');
+  const d = S.docs.find(x => x.id === id), t = S.files.find(x => x.id === id) || S.templates.find(x => x.code === id);
+  const title = d ? d.title : [t.code, t.title || t.name, t.rev && 'Rev.' + t.rev].filter(Boolean).join(' '), pg = d ? d.pages : t.pages, code = d ? 'FM-CE.SE-006' : t.code || t.title;
+  const pages = Array.from({ length: Math.min(pg, 200) }, (_, i) => `<div class="page"><div class="hd"><i></i><span>${esc(code)}${i ? ` · แผ่นที่ ${i + 1}` : ''}</span></div><div class="ln"></div>${i ? '' : '<div class="ln s"></div>'}</div>`).join('');
   return `${nav(title, back, `<button data-sheet="${d ? 'info' : 'src'}:${esc(id)}" aria-label="ข้อมูลรายงาน">${ic('info')}</button><button data-share aria-label="แชร์">${ic('share')}</button>`)}
- <div class="pages" data-pg="${pg}">${pages}<div class="pgbar">หน้า <span id="pn">1</span>/${pg}</div></div>`;
+ <div class="pages" data-pg="${pg}">${d ? `<div class="vbd">${BADGE}</div>` : ''}${pages}<div class="pgbar">หน้า <span id="pn">1</span>/${pg}</div></div>`;
 }
 
-// ---------- งาน PM ----------
+// ---------- งาน PM: รายการงาน (หลายระบบถึงรอบพร้อมกันได้) → หน้างาน ----------
+const dShortY = iso => `${dShort(iso)} ${String(ymd(iso)[0] + 543).slice(2)}`;
+const jstat = j => j.status === 'done' ? st('ok', `เสร็จแล้ว · ${dShortY(j.dates[1])}`) : st('todo', j.status === 'doing' ? 'กำลังทำ' : 'ยังไม่เริ่ม');
+const jobRow = j => `<a class="row" href="#/pm/${j.id}"><span class="rt"><span>${esc(j.title)}</span><span class="sub">${dRange(j.dates)}</span>${jstat(j)}</span><span class="rv">ฟอร์ม ${formsDone(j)}/${j.forms.length}</span>${chev}</a>`;
 export function pm(S) {
-  const j = S.job, n = j.forms.length, k = formsDone(j), ready = k === n;
+  const g = [['doing', 'กำลังทำ'], ['todo', 'ยังไม่เริ่ม'], ['done', 'เสร็จแล้ว']].map(([k, t]) => { const L = S.jobs.filter(j => j.status === k).sort((a, b) => b.touched.localeCompare(a.touched));
+    return L.length ? `<div class="sh">${t}</div><div class="grp">${L.map(jobRow).join('')}</div>` : ''; }).join('');
+  return `${nav('งาน PM')}<div class="in"><h1 class="lt">งาน PM</h1><div class="pad2"><button class="btn" data-sheet="new:">${ic('plus')}เริ่มงานใหม่</button></div>${g}</div>`;
+}
+export function job(S, id, back) {
+  const j = S.jobs.find(x => x.id === id), n = j.forms.length, k = formsDone(j), ready = k === n, b = `#/pm/${j.id}`;
   const rows = j.forms.map(f => {
     const [, kind, text] = formState(j, f), body = `<span class="rt"><span>${f.code ? f.code + ' ' : ''}${esc(f.name)}</span>${st(kind, text)}</span>${f.go === 'cam' ? ic('cam', 'ch') : ''}${chev}`;
-    const href = f.kind === 'tx' ? '#/pm/fill' : f.kind === 'asset' ? '#/pm/asset' : f.go === 'tools' ? '#/pm/tools' : '';
+    const href = f.kind === 'tx' ? b + '/fill' : f.kind === 'asset' ? b + '/asset' : f.go === 'tools' ? b + '/tools' : '';
     return href ? `<a class="row" href="${href}">${body}</a>` : `<button class="row" data-toast="ฟอร์มนี้ทำในขั้น 2">${body}</button>`;
   }).join('');
-  return `${nav('งาน PM')}<div class="in"><h1 class="lt">งาน PM</h1>
- <div class="grp"><div class="p16"><div class="cap">งานปัจจุบัน</div><div class="big">${esc(j.title)}</div><div class="bar2"><i style="width:${100 * k / n}%"></i></div><div class="sec">ฟอร์ม ${k}/${n} เสร็จ</div>
-  ${ready ? '<button class="btn mt3" data-toast="ออกรายงานทำในขั้น 2">ออกรายงาน</button>' : `<button class="btn alt mt3" data-sheet="ready">${ic('clip')}ตรวจความพร้อม · ${k}/${n}</button>`}</div></div>
+  const cta = j.status === 'todo' ? `<button class="btn mt3" data-start="${j.id}">เริ่มงาน</button>` : j.status === 'done' ? `<div class="mt3">${jstat(j)}</div>`
+    : ready ? '<button class="btn mt3" data-toast="ออกรายงานทำในขั้น 2">ออกรายงาน</button>' : `<button class="btn alt mt3" data-sheet="ready">${ic('clip')}ตรวจความพร้อม · ${k}/${n}</button>`;
+  return `${nav(j.title, back)}<div class="in pt2">
+ <div class="grp"><div class="p16"><div class="cap">${dRange(j.dates)}</div><div class="big">${esc(j.title)}</div><div class="bar2"><i style="width:${100 * k / n}%"></i></div><div class="sec">ฟอร์ม ${k}/${n} เสร็จ</div>${cta}</div></div>
  <div class="sh">ฟอร์มของงานนี้</div><div class="grp">${rows}</div>
- <div class="grp"><a class="row" href="#/pm/folder">${ic('folder', 'lead')}<span class="rt"><span>ฟอร์มอื่น ๆ และรูปประกอบ</span><span class="sub">โฟลเดอร์ของงานนี้ · รูปสถานี รูปการทำงาน เอกสารเพิ่มเติม</span></span>${chev}</a></div></div>`;
+ <div class="grp"><a class="row" href="${b}/folder">${ic('folder', 'lead')}<span class="rt"><span>ฟอร์มอื่น ๆ และรูปประกอบ</span><span class="sub">โฟลเดอร์ของงานนี้ · รูปสถานี รูปการทำงาน เอกสารเพิ่มเติม</span></span>${chev}</a></div></div>`;
 }
 const fld = (S, f, t, n) => {
   const v = t.v[f.k] ?? '', b = bad(f, v);
@@ -131,7 +174,7 @@ export function table(S, _, back) {
  <div class="wi"><div class="grp">${idFld(S, j.tx[m - 1], m, 'asset', `Asset No · Tx ${m}`, 'จากสติกเกอร์ทรัพย์สิน').replace('<input ', '<input id="wiAsset" ')}</div>
  <div class="seg"><button data-pane="w-wi" aria-pressed="true">WI</button><button data-pane="w-pr" aria-pressed="false">รอบก่อน</button><button data-pane="w-pdf" aria-pressed="false">ฟอร์ม PDF</button></div>
  <div class="pane" id="w-wi"><div class="p16"><b>WI-CE.SE-02 Rev.06 · หน้า 50 · ภาคผนวก ข</b><div class="sec" id="wf">ช่องที่เลือก: ${esc(cols[2].n)} · Tx ${m}</div></div><div class="page w70"><div class="hd"><i></i><span>WI-CE.SE-02 · หน้า 50</span></div><div class="ln"></div></div>${wiText}</div>
- <div class="pane" id="w-pr" hidden><div class="p16"><a class="btn alt" href="#/pm/doc/radio-dm-2569-2-69">${ic('doc')}เปิดรายงานรอบก่อน (PM DM TxS 2/69)</a></div></div>
+ <div class="pane" id="w-pr" hidden><div class="p16"><a class="btn alt" href="#/pm/${j.id}/doc/tx-stby-2569-2-69">${ic('doc')}เปิดรายงานรอบก่อน (PM DM TX Radio STBY 2/69)</a></div></div>
  <div class="pane" id="w-pdf" hidden><div class="page"><div class="hd"><i></i><span>FM-CE.SE-202 Rev.04</span></div><div class="ln"></div></div></div></div></div>`;
 }
 const wiText = `<div class="grp"><div class="p16"><div class="cap">ขั้นตอน</div>ต่อ CMA180 เข้า Ant port ผ่าน Attn 30 dB ตั้ง… (ข้อความตัวอย่าง)</div></div>`;
@@ -153,31 +196,29 @@ export function folder(S, _, back) {
   return `${nav('โฟลเดอร์งาน', back)}<div class="in"><h1 class="lt">โฟลเดอร์งาน ${esc(S.job.title)}</h1><div class="sh">รูปประกอบ (${f.photos.length})</div><div class="ph">${tiles}</div>
  <div class="sh">เอกสารเพิ่ม</div><div class="grp">${f.docs.map(d => `<button class="row" data-toast="ดูเอกสารเพิ่มทำในขั้น 2">${ic('doc', 'lead')}<span class="rt"><span>${esc(d.name)}</span>${st('todo', 'ร่าง')}</span>${chev}</button>`).join('')}</div>
  <div class="pad2"><button class="btn" data-cam="folder">${ic('cam')}ถ่ายรูป</button><button class="btn alt" data-file="folder">${ic('doc')}เพิ่มไฟล์</button><button class="btn alt" data-toast="แนบท้ายรายงานทำในขั้น 2">${ic('clip')}แนบท้ายรายงาน</button></div>
- <p class="sec note c">เก็บในเครื่องก่อน · ขั้นต่อไปส่งขึ้นโฟลเดอร์งานบน SharePoint</p></div>`;
+ <p class="sec note c">เก็บในเครื่องก่อน · ขั้นต่อไปส่งขึ้นโฟลเดอร์งานบนเซิร์ฟเวอร์กอง</p></div>`;
 }
 
-// ---------- คู่มือ / ฉัน ----------
-export function man(S) {
-  const pane = S.ui.m || 'm-fm', T = S.templates, on = t => store.isOffline(t.code, t.offline !== false);
-  const auto = store.pref('auto') !== false;
-  const list = kind => T.filter(t => t.kind === kind).map(t => { const o = on(t);
-    return swr(`<a class="row" href="#/man/doc/${t.code}"><span class="rt"><span>${t.code} Rev.${t.rev} ${t.isNew ? '<span class="bdg">ใหม่</span>' : ''}</span><span class="sub">${t.isNew ? `Rev.${t.prev} → ${t.rev} · ${dShort(t.changed)}` : esc(t.name)}</span>${o ? st('dl', 'ตั้งไว้ (ตัวอย่าง)') : st('cloud', 'ยังไม่ตั้ง')}</span>${chev}</a>`, t.code, o); }).join('');
-  return `${nav('คู่มือ')}<div class="in">${ptr}<h1 class="lt">คู่มือ</h1>
- <label class="search">${ic('search')}<input type="search" data-filter placeholder="ค้นหาฟอร์ม / WI (รหัสหรือชื่อ)" aria-label="ค้นหาฟอร์ม / WI"></label>
- <div class="grp"><div class="kv"><span>จากเว็บกอง ${dShort(T[0].fetchedAt)} ${hhmm(T[0].fetchedAt)}</span>${st('ok', 'เป็นปัจจุบัน')}</div><div class="kv"><span>ตั้งเก็บ offline อัตโนมัติ · ตัวอย่าง (ยังไม่โหลดไฟล์จริง)</span>${sw(auto, 'data-pref="auto" aria-label="ตั้งเก็บ offline อัตโนมัติ (ตัวอย่าง)"')}</div></div>
- <div class="seg"><button data-pane="m-fm" aria-pressed="${pane === 'm-fm'}">ฟอร์ม</button><button data-pane="m-wi" aria-pressed="${pane === 'm-wi'}">WI</button></div>
- <div class="pane" id="m-fm" ${pane === 'm-fm' ? '' : 'hidden'}><div class="grp">${list('form')}</div></div><div class="pane" id="m-wi" ${pane === 'm-wi' ? '' : 'hidden'}><div class="grp">${list('wi')}</div></div></div>`;
-}
+// ---------- ฉัน (แท็บหลัก) ----------
 export function me(S) {
-  const r = (i, t, s) => `<button class="row" data-toast="โหมดตัวอย่าง · ยังไม่เปิดใช้">${ic(i, 'lead')}<span class="rt"><span>${t}</span><span class="sub">${s}</span></span>${chev}</button>`;
-  return `${nav('ฉัน')}<div class="in"><div class="hero"><div class="avatar">${esc([...S.user.name][0])}</div><div class="big">${esc(S.user.name)}</div><div class="sec">CE.SE · AEROTHAI</div></div>
- <div class="grp">${r('sig', 'ลายเซ็นของฉัน', 'ใช้ตอนออกรายงาน')}${r('dl', 'พื้นที่ offline', `ตัวอย่าง · ตั้งไว้ ${store.offlineCount()} รายการ · ยังไม่ได้โหลดไฟล์จริง`)}${r('ok', 'บัญชี SharePoint', 'โหมดตัวอย่าง · ยังไม่เชื่อมต่อ')}${r('info', 'เกี่ยวกับ / เวอร์ชัน', `${S.version} (demo)`)}</div>
+  const r = (i, t, s) => `<button class="row" data-toast="โหมดตัวอย่าง · ยังไม่เปิดใช้">${ic(i, 'lead')}<span class="rt"><span>${t}</span><span class="sub">${s}</span></span>${chev}</button>`, auto = store.pref('auto') !== false;
+  return `${nav('ฉัน')}<div class="in"><h1 class="lt">ฉัน</h1><div class="hero"><div class="avatar">${esc([...S.user.name][0])}</div><div class="big">${esc(S.user.name)}</div><div class="sec">${esc(S.user.email || 'CE.SE · AEROTHAI')}</div></div>
+ <div class="grp">${r('ok', 'บัญชีบริษัท', 'โหมดตัวอย่าง · ยังไม่เชื่อมต่อ')}${r('sig', 'ลายเซ็นของฉัน', 'ใช้ตอนออกรายงาน')}${r('gear', 'ตั้งค่า', 'แจ้งเตือนรอบ PM · calibration')}</div>
+ <div class="sh">พื้นที่ offline</div><div class="grp"><div class="kv"><span>ตั้งเก็บ offline อัตโนมัติ · ตัวอย่าง (ยังไม่โหลดไฟล์จริง)</span>${sw(auto, 'data-pref="auto" aria-label="ตั้งเก็บ offline อัตโนมัติ (ตัวอย่าง)"')}</div><div class="kv"><span>ตั้งไว้ในเครื่อง</span><span>${store.offlineCount()} รายการ</span></div></div>
+ <div class="grp">${r('info', 'เกี่ยวกับ / เวอร์ชัน', `${S.version} (demo)`)}</div>
  <div class="grp k"><button class="row red" data-signout>${ic('out')}ออกจากระบบ</button></div></div>`;
 }
 
 // ---------- sheet ----------
 export function sheet(S, kind, id) {
   const h = (t, body) => `<i class="grab"></i><div class="sh-h"><span>${t}</span><button data-close>เสร็จ</button></div>${body}`;
+  if (kind === 'new') {
+    const t = bkk(), e = new Date(Date.parse(t) + 2 * 864e5).toISOString().slice(0, 10);
+    return h('เริ่มงานใหม่', `<div class="sh">ระบบ</div><div class="grp" role="radiogroup" aria-label="ระบบ">${S.catalog.systems.map(x => `<button class="row" role="radio" aria-checked="false" data-sys="${x.id}"><span class="rt"><span>${esc(x.name)}</span>${x.loc ? `<span class="sub">${esc(x.loc)}</span>` : ''}</span>${ic('ok', 'ck')}</button>`).join('')}</div>
+ <div class="sh">ครั้งที่</div><label class="search"><input id="nrd" value="3/69" inputmode="text" autocomplete="off" aria-label="ครั้งที่"></label>
+ <div class="sh">ช่วงวันที่ปฏิบัติงาน</div><label class="search"><span class="cap">เริ่ม</span><input type="date" id="nd1" value="${t}" aria-label="วันเริ่ม"></label><label class="search"><span class="cap">สิ้นสุด</span><input type="date" id="nd2" value="${e}" aria-label="วันสิ้นสุด"></label>
+ <div class="pad2"><button class="btn" data-create>สร้างงาน</button></div>`);
+  }
   if (kind === 'ready') {
     const j = S.job, miss = j.forms.length - formsDone(j);
     return h('ความพร้อมก่อนออกรายงาน', `<p class="sec note">${miss ? `ยังขาด ${miss} ฟอร์ม` : 'ครบทุกฟอร์มแล้ว'}</p><div class="grp">${j.forms.map(f => { const [, k, t] = formState(j, f); return `<div class="row"><span class="rt"><span>${f.code ? f.code + ' ' : ''}${esc(f.name)}</span>${st(k, t)}</span></div>`; }).join('')}</div>`);
@@ -193,10 +234,10 @@ export function sheet(S, kind, id) {
     const d = S.docs.find(x => x.id === id), o = isOff(S, id), s = S.catalog.systems.find(x => x.id === d.system);
     return h('ข้อมูลรายงาน', `<div class="p16"><b>${esc(d.title)}.pdf</b><div class="chips"><span>CE.SE</span>›<span>รายงาน PM</span>›<span>${esc(s.name)}</span>›<span>${d.year}</span>›<span>${d.round.replace('/', '-')}</span></div></div>
  <div class="grp"><div class="kv"><span>แก้ไขล่าสุด</span><span>${dFull(d.modified)} โดย ${esc(d.by)}</span></div><div class="kv"><span>ขนาด</span><span>${(d.size / 1e6).toFixed(1)} MB</span></div><div class="kv"><span>เก็บไว้ดู offline (ตัวอย่าง)</span>${sw(o, `data-off="${d.id}" aria-label="เก็บไว้ดู offline"`)}</div></div>
- <div class="pad2"><button class="btn" data-toast="โหมดตัวอย่าง · ยังไม่เชื่อม SharePoint">${ic('ext')}เปิดใน SharePoint</button></div>
+ <div class="pad2"><button class="btn" data-toast="โหมดตัวอย่าง · ยังไม่เชื่อมเซิร์ฟเวอร์กอง">${ic('ext')}เปิดไฟล์ต้นฉบับ</button></div>
  <div class="pad2"><details class="rel"><summary>${ic('doc')}เอกสารที่เกี่ยวข้อง</summary><div class="kv"><span>หนังสือคำสั่งปฏิบัติงาน PM</span><span>PDF</span></div><div class="kv"><span>WI-CE.SE-02 Rev.06 (หน้า 50–54)</span><span>WI</span></div></details></div>`);
   }
-  const t = S.templates.find(x => x.code === id), o = isOff(S, id);
-  return h('ที่มาเอกสาร', `<div class="grp"><div class="kv"><span>ที่มา</span><span>${t.sourceUrl.replace('https://', '')}</span></div><div class="kv"><span>ดึงโดย</span><span>collector ${dShort(t.fetchedAt)}</span></div>
+  const t = S.files.find(x => x.id === id) || S.templates.find(x => x.code === id), o = isOff(S, id), u = new URL(t.sourceUrl), src = u.pathname.length > 30 ? u.host + '/…/' + decodeURIComponent(u.pathname.split('/').pop()) : u.host + u.pathname;
+  return h('ที่มาเอกสาร', `<div class="grp"><div class="kv"><span>ที่มา</span><span>${esc(src)}</span></div><div class="kv"><span>ดึงโดย</span><span>collector ${dShort(t.fetchedAt)}</span></div>
  <div class="kv"><span>เก็บไว้ดู offline (ตัวอย่าง)</span>${sw(o, `data-off="${id}" aria-label="เก็บไว้ดู offline"`)}</div></div><div class="pad2"><button class="btn" data-toast="โหมดตัวอย่าง · ยังไม่เปิดเว็บกอง">${ic('ext')}เปิดบนเว็บกอง</button></div>`);
 }

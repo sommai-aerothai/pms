@@ -14,12 +14,22 @@ export const getDocUrl = id => be().getDocUrl(id);
 export const listTemplates = () => be().listTemplates();
 export const getBlob = id => be().getBlob(id);
 export const getCatalog = () => be().getCatalog();
-export const getRecent = async () => ls.get('pms.recent') || be().getRecent();
-export const touchRecent = async id => ls.set('pms.recent', [[id, new Date().toISOString()], ...(await getRecent()).filter(r => r[0] !== id)].slice(0, 5));
 
-// งาน PM: ค่าที่พิมพ์/รูปเก็บในเครื่อง (localStorage) — ปิดแอปเปิดใหม่ยังอยู่
-export const getJob = async id => ls.get('pms.job.' + id) || be().getJob(id);
+export const getFiles = () => be().getFiles();
+
+// งาน PM = jobs[]: ค่าที่พิมพ์/รูปเก็บในเครื่อง (localStorage 'pms.job.<id>') · งานที่ผู้ใช้สร้างเก็บรายการ id ไว้ที่ 'pms.jobx'
+export const listJobs = async () => {
+  const seed = await be().listJobs(), mine = (ls.get('pms.jobx') || []).map(id => ls.get('pms.job.' + id)).filter(Boolean);
+  return [...seed.map(j => ({ ...j, ...ls.get('pms.job.' + j.id) })), ...mine];
+};
 export const putJob = job => ls.set('pms.job.' + job.id, job);
+export const newJob = async (sys, round, dates) => {
+  const ids = new Set((await listJobs()).map(j => j.id)); let id = `${sys.id}-${round.replace('/', '-')}`; if (ids.has(id)) id += '-' + Date.now().toString(36);
+  const j = be().genericJob(id, `${sys.name} ${round}`, sys.id, round, dates, 'todo', new Date().toISOString());
+  if (!putJob(j)) return null;
+  if (!ls.set('pms.jobx', [...(ls.get('pms.jobx') || []), id])) { localStorage.removeItem('pms.job.' + id); return null; }   // ดัชนีเขียนไม่ได้ = ไม่ถือว่าสร้างสำเร็จ
+  return j;
+};
 
 // ค่าตั้ง/ผู้ใช้/รายการเก็บ offline
 export const pref = (k, v) => (v === undefined ? ls.get('pms.' + k) : ls.set('pms.' + k, v));
