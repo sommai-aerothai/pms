@@ -22,7 +22,7 @@
   <div class="logo">PMS</div>
   <div><b>Preventive Maintenance System</b><div class="sec m">CE.SE · AEROTHAI</div></div>
   <form class="lg1" id="loginForm" novalidate>
-   <label class="search"><input type="email" id="email" name="username" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="name@aerothai.co.th" aria-label="Username"></label>
+   <label class="search"><input type="text" id="email" name="username" inputmode="text" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="sommai.sa" aria-label="Username"></label>
    <label class="search"><input type="password" id="pass" name="password" autocomplete="current-password" placeholder="Password" aria-label="Password"><button class="peek" type="button" data-peek aria-label="Show password" aria-pressed="false"><svg class="ic"><use href="./ui/icons.svg#i-eye"/></svg></button></label>
    <p class="st w lg-err" id="lgErr" role="alert" hidden><svg class="ic"><use href="./ui/icons.svg#i-warn"/></svg><span></span></p>
    <button class="btn" type="submit">Sign in</button>
@@ -51,7 +51,8 @@
  <section class="screen push" id="s-table"></section>
  <section class="screen push" id="s-asset"></section>
  <section class="screen push" id="s-tools"></section>
- <section class="screen push" id="s-folder"></section>
+ <section class="screen push" id="s-pick"></section>
+ <section class="screen push" id="s-open"></section>
  <section class="screen push" id="s-import"></section>
  <section class="screen push" id="s-sarabun"></section>
 
@@ -71,7 +72,7 @@
  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="รายละเอียด"></div>
 </div>
 <input type="file" id="cam" accept="image/*" capture="environment" hidden>
-<input type="file" id="file" accept="image/*,application/pdf" hidden>
+<input type="file" id="file" hidden>
 <script type="module" src="./js/app.js"></script>
 </body>
 </html>

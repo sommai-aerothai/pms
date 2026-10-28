@@ -138,7 +138,7 @@ details.rel summary::-webkit-details-marker{display:none}
 .fld .t{font-size:var(--fs-body)}
 .fld:not(:has(.cam))::after{content:"";width:var(--tap);flex:none}
 .fld input{width:var(--u-84);border:0;background:none;outline:0;text-align:right;font-size:var(--fs-value);font-weight:700;padding:0}
-.fld input.wide{width:var(--u-140);font-size:var(--fs-cell)}
+.fld input.wide{width:auto;flex:1;min-width:var(--u-140);font-size:var(--fs-cell)}
 .fld .u{width:var(--u-38);font-size:var(--fs-sub);color:var(--text-2)}
 .fld .wn{display:none;align-items:center;gap:var(--space-1);font-size:var(--fs-sub);font-weight:600;color:var(--warn)}
 .fld .wn .ic{width:var(--u-18);height:var(--u-18)}
@@ -256,3 +256,85 @@ td.bad::after{content:"⚠︎ เกินช่วง";display:block;text-align
 .stp{display:flex;gap:var(--space-3);align-items:flex-start;padding:var(--space-3) var(--space-4)}
 .stp .n{flex:none;display:grid;place-items:center;width:var(--u-28);height:var(--u-28);border-radius:var(--radius-round);background:var(--accent);color:var(--accent-on-fill);font-weight:700;font-size:var(--fs-sub)}
 .stp .rt{display:flex;flex-direction:column;gap:var(--space-1);min-width:0}.stp .sub{font-size:var(--fs-sub);color:var(--text-2)}.stp .st{align-self:flex-start}
+
+/* ===== flow ใหม่ (PR feature/pm-flow) ===== */
+/* วงความคืบหน้า: 0 = วงเปล่า · บางส่วน = ส่วนโค้ง · ครบ = เขียวทึบติ๊กขาว */
+.rg{display:inline-flex;flex:none;width:var(--u-24);height:var(--u-24)}
+.rg svg{display:block;width:100%;height:100%}
+.rg .tr{fill:none;stroke:var(--ctrl-border);stroke-width:var(--u-2)}
+.rg .ar{fill:none;stroke:var(--accent);stroke-width:var(--u-3);stroke-linecap:round;stroke-dasharray:var(--p) 100;transition:stroke-dasharray var(--dur-count) var(--ease)}
+.rg .ar[data-p="0"]{stroke-opacity:0}
+.rg .fl{fill:var(--done)}
+.rg .tk{fill:none;stroke:var(--white);stroke-width:var(--u-2);stroke-linecap:round;stroke-linejoin:round}
+/* ป้ายที่มาของค่า */
+.src{display:inline-flex;align-items:center;gap:var(--u-4);padding:var(--u-2) var(--u-10);border-radius:var(--radius-control);border:var(--hair) solid var(--ctrl-border);background:var(--card);color:var(--text);font-size:var(--fs-caption);font-weight:600;white-space:nowrap;align-self:flex-start}
+.src .ic{width:var(--u-16);height:var(--u-16);color:var(--text-2)}
+.src.dash{border-style:dashed}
+.src.w,.src.w .ic{color:var(--warn)}.src.w{border-color:var(--warn)}
+.tags{display:flex;flex-wrap:wrap;gap:var(--space-1);margin-top:var(--u-4)}.tags:empty{display:none}
+/* ปุ่มเล็ก (แคปซูล) */
+.btn.sm{width:auto;flex:none;min-height:var(--tap);padding:0 var(--space-4);font-size:var(--fs-sub)}
+.mt3.src,.src.mt3{margin-top:var(--space-3)}
+/* nav: ปุ่มค้นหาวงกลม → ช่องค้นหาขยายใน nav */
+.nsr{display:none}
+.sbtn{border:var(--hair) solid var(--ctrl-border);background:var(--card);color:var(--accent-text);width:var(--tap);height:var(--tap);border-radius:var(--radius-control)}
+.acts .sbtn{min-width:var(--tap);margin-left:var(--space-1)}
+.nav.so{display:flex;align-items:center;gap:var(--space-2);padding:var(--st) var(--space-2) 0 var(--space-4)}
+.nav.so>:not(.nsr){display:none}
+.nav.so .nsr{display:flex;flex:1;align-items:center;gap:var(--space-2);min-width:0}
+.nsr .search{flex:1;margin:0;min-width:0}
+.nsr>button{color:var(--accent-text);font-weight:600;min-height:var(--tap);padding:0 var(--space-2);border-radius:var(--radius-control);white-space:nowrap}
+.sync{display:flex;align-items:center;gap:var(--space-2)}.sync .ic{width:var(--u-18);height:var(--u-18);color:var(--accent-text)}
+.gx{margin:0 var(--space-6) var(--space-2);font-size:var(--fs-caption);color:var(--text-2)}
+.dhome .gx{margin:0 var(--space-4) var(--space-2)}.dhome .sh{margin:var(--space-3) var(--space-4) var(--u-4)}
+/* วันนี้ */
+.tr{align-items:flex-start;padding-top:var(--space-3);padding-bottom:var(--space-3)}
+.tr b{font-weight:600}.tr .btn.sm{align-self:center}
+.today .src{display:inline-flex}
+/* รายการงาน */
+.row .rsn{color:var(--text)}
+.more{color:var(--accent-text);font-weight:600}
+.seg.scr{overflow-x:auto;scrollbar-width:none}
+/* เปิดงาน */
+.vr{align-items:flex-start}.vr .cap{display:block}
+.rowh{display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)}.rowh .lead{color:var(--accent)}
+.p16>.btn.sm{margin-top:var(--space-3)}
+.chipr{display:flex;flex-wrap:wrap;gap:var(--space-2);margin:var(--space-3) 0}
+.pill{display:inline-flex;align-items:center;gap:var(--u-6);min-height:var(--tap);padding:0 var(--space-4);border-radius:var(--radius-control);border:var(--hair) solid var(--ctrl-border);background:var(--card);font-size:var(--fs-sub);font-weight:600}
+.pill .ic{width:var(--u-16);height:var(--u-16);color:var(--text-2)}
+.pill[aria-checked=true]{background:var(--accent);color:var(--accent-on-fill);border-color:var(--accent)}.pill[aria-checked=true] .ic{color:var(--accent-on-fill)}
+.p16 .search{margin:var(--space-2) 0 var(--space-3)}.p16 .seg{margin:var(--space-2) 0 var(--space-3)}.p16>b{display:block;margin-top:var(--space-2)}
+/* หน้างาน */
+.stg{display:flex;align-items:center;gap:var(--space-2);width:calc(100% - var(--space-4)*2);margin:0 var(--space-4) var(--space-3);min-height:var(--tap);padding:0 var(--space-4);border-radius:var(--radius-control);border:var(--hair) solid var(--ctrl-border);background:var(--card)}
+.stg .stn{display:flex;align-items:center;gap:var(--space-2);font-weight:700}
+.stg .dot{width:var(--u-10);height:var(--u-10);border-radius:var(--radius-round);background:var(--accent)}
+.stg .sa{display:flex;color:var(--ctrl-border)}.stg .sa .ic{width:var(--u-18);height:var(--u-18)}
+.stg .sinfo{margin-left:auto;display:flex;color:var(--accent-text)}
+.gh{display:flex;flex-direction:column;padding:var(--u-14) var(--space-4) var(--space-2);font-size:var(--fs-value);font-weight:700;line-height:1.25}
+.gh .sub{font-size:var(--fs-sub);font-weight:400;color:var(--text-2);margin-top:var(--u-2)}
+.card.grp{margin-bottom:var(--space-5)}
+.sh2{padding:var(--space-3) var(--space-4) var(--space-1);font-size:var(--fs-caption);font-weight:700;color:var(--text-2)}
+.acts2{display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:flex-end}
+.row.sr .sw{flex:none}
+.row.pr{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)}
+.row.pr .btn{min-height:var(--tap)}
+.row.cf{justify-content:space-between;gap:var(--space-2);flex-wrap:wrap}.row.cf .rt{flex:none}
+.fn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wic{font-size:var(--fs-sub);color:var(--text-2)}
+.cur{font-weight:700}
+.hl{box-shadow:inset 0 0 0 var(--u-3) var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--card))}
+.card .row[data-spot-id]{transition:background var(--dur-quick),box-shadow var(--dur-quick)}
+td.pd input{border-style:dashed}
+/* CTA ยังไม่พร้อม = เทาอ่อนสุด + วงความคืบหน้า (ตัวอักษรผ่าน 4.5:1) */
+.cta.soft{background:var(--idle-fill);color:var(--idle-ink);border:var(--hair) solid var(--ctrl-border)}
+.cta .rg{width:var(--u-24);height:var(--u-24)}
+.sheet .rg{margin-top:var(--u-2)}
+.vl{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}
+.wrapr{flex-wrap:wrap}.wrapr .acts2{flex-basis:100%;justify-content:flex-start}
+.dv .grp{margin:var(--u-6) 0 0}
+.dv summary{cursor:pointer}
+.dots{display:inline-flex;align-items:center;gap:var(--u-6)}
+.dots .d{width:var(--u-10);height:var(--u-10);border-radius:var(--radius-round);border:var(--hair) solid var(--ctrl-border);background:var(--card)}
+.dots .d.dn{background:var(--accent);border-color:var(--accent)}
+.dots .d.cur{width:var(--u-14);height:var(--u-14);border:var(--u-3) solid var(--accent)}
+.lnk{color:var(--accent-text);font-weight:600}
