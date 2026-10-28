@@ -288,7 +288,7 @@ export function job(S, id, back) {
  ${todoCard(S, j, ph)}
  <div class="grp card"><div class="gh">นำเข้าผลหน้างาน<span class="sub">ไฟล์ · รูป · กระดาษที่จดค่า ระบบเติมฟอร์มให้ · อ่านในเครื่อง ไม่ส่งออกนอกเครื่อง</span></div>
  <div class="row pr"><button class="btn alt" data-cam="attach">${ic('cam')}ถ่ายรูป</button><button class="btn alt" data-file="attach">${ic('doc')}เลือกไฟล์</button></div>
- <!-- fieldsheet-print-slot: ปุ่ม "พิมพ์ใบจดค่า" (lane 5 เสียบหลัง PR นี้ merge) -->
+ ${(j.tx || []).length ? `<div class="row pr"><a class="btn alt" href="./fieldsheet.html?job=${encodeURIComponent(j.id)}&n=${j.tx.length}&freqs=${j.tx.map(t => +t.freq || '').join(',')}" target="_blank" rel="noopener">${ic('doc')}พิมพ์ใบจดค่า</a><span class="sec">จดลายมือหน้างาน แล้วถ่ายรูปกลับมา ระบบเติมให้</span></div>` : ''}
  ${(j.files || []).length ? fileRows(S, j) : `<div class="row"><span class="sec">ยังไม่มีไฟล์ · แนบฟอร์มที่กรอกในคอม (.xlsx .docx) รูป หรือ PDF · ไม่รับวิดีโอ</span></div>`}</div>
  <div class="grp card"><div class="gh">ฟอร์ม<span class="sub">ตามขอบเขต WI · ${nPend ? `เติมจากไฟล์แล้ว รอยืนยัน ${nPend} ช่อง` : 'ไฟล์เติมให้ก่อน ที่เหลือกรอกเอง'}</span></div>${forms}
  <button class="row" data-sheet="example"><span class="rt"><span class="cap">ตัวอย่างรายงานที่ใช้เทียบ</span><span>${ex ? esc(F.fmtTitle(ex.title)) : 'ยังไม่มีตัวอย่าง'} · <b class="lnk">เปลี่ยน</b></span></span>${chev}</button></div>
