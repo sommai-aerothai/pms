@@ -10,6 +10,7 @@ import { tok } from './tok.js';
 import * as M from './motion.js';
 import { CONFIG } from './config.js';
 import * as imp from './import-sarabun.js';
+import { renderPdf, sweep } from './pdfview.js';
 
 const VERSION = 'v0.9.0';
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -51,7 +52,8 @@ async function signView(el, id) {
   S.urls[id] = { wait: true, exp: 0 };
   try { const url = await store.fileUrl(it); if (!url) throw { code: 'notfound' }; S.urls[id] = { url, exp: Date.now() + 54e4 }; }
   catch (e) { S.urls[id] = { err: e && e.code ? e : { code: 'server', detail: String((e && e.message) || e) }, exp: 0 }; }
-  const c = chain[chain.length - 1]; if (c.id === 's-view' && c.arg === id) { el.dataset.k = ''; paint(c, chain.length - 1); }   // ยังเปิดไฟล์นี้อยู่ = วาดตัวดูใหม่ด้วย URL/ข้อผิดพลาด
+  el.dataset.k = '';   // วาดใหม่ครั้งหน้าที่เปิดหน้านี้ (ออกไปแล้วกลับมา ต้องไม่ค้าง "กำลังเปิดไฟล์…")
+  const c = chain[chain.length - 1]; if ($('#' + c.id) === el) paint(c, chain.length - 1);   // ยังอยู่หน้าเดิม = วาดใหม่ทันที
 }
 
 // ---------- router: hash → {tab, stack} ----------
@@ -89,8 +91,9 @@ function resolve() {
       if (j) {
         if (saveT && S.job !== j) save();   // ยังมีค่าค้างบันทึกของงานก่อนหน้า → บันทึกก่อนสลับ
         S.job = j; st.push({ id: 's-job', arg: j.id, title: F.fmtTitle(j.title) });
-        const m = { fill: [pad.matches ? 's-table' : 's-fill', 'เครื่องส่ง'], table: [pad.matches ? 's-table' : 's-fill', 'เครื่องส่ง'], asset: ['s-asset', 'ทะเบียนอุปกรณ์'], tools: ['s-tools', 'เครื่องมือวัด'] }[rest[1]];
-        if (m && (m[0] !== 's-table' && m[0] !== 's-fill' || j.tx)) st.push({ id: m[0], arg: j.id, title: m[1] });
+        const tx = store.pref('fmode') === 'form' ? 's-form' : pad.matches ? 's-table' : 's-fill';   // โหมดกรอกที่เลือกล่าสุด (ช่องกรอก | บนฟอร์ม)
+        const m = { fill: [tx, 'เครื่องส่ง'], table: [tx, 'เครื่องส่ง'], form: ['s-form', 'เครื่องส่ง'], asset: ['s-asset', 'ทะเบียนอุปกรณ์'], tools: ['s-tools', 'เครื่องมือวัด'] }[rest[1]];
+        if (m && (!/^s-(table|fill|form)$/.test(m[0]) || j.tx)) st.push({ id: m[0], arg: j.id, title: m[1] });
       }
     }
   }
@@ -109,6 +112,14 @@ function paint(c, i) {
   if (c.id === 's-sarabun') bmFill(el);
   if (c.id === 's-users' && !S.users) { S.users = { st: 'load' }; fetchUsers(); }
   if (c.id === 's-view') signView(el, c.arg);
+  if (c.id === 's-form') { const it = V.form202(S); if (it) signView(el, it.id); }
+  mountPdf(el, c.id === 's-form');
+}
+// วาด PDF ลงที่ [data-pdf] ของหน้าที่เพิ่งวาด · หน้า "บนฟอร์ม" = วางช่องกรอกทับ และวาดหน้าซ้ำตามจำนวนเครื่อง (หน้าละ 20)
+function mountPdf(el, form) {
+  sweep(); const h = $('[data-pdf]', el); if (!h) return;
+  renderPdf(h, h.dataset.pdf, form ? { over: (i, c) => i ? '' : V.formOver(S, c), copies: Math.max(1, Math.ceil(S.job.tx.length / 20)) } : {})
+    .catch(() => { if (h.isConnected) h.innerHTML = `<div class="grp"><div class="p16 errc">${V.ic('warn')}เปิด PDF ในหน้านี้ไม่สำเร็จ · ${form ? 'ใช้ "ช่องกรอก" ด้านบนแทน (ค่าชุดเดียวกัน)' : 'ใช้ปุ่มเปิดในแท็บใหม่'}</div></div>`; });
 }
 function draw() {
   const r = resolve(), changed = r.tab !== lastTab, from = lastTab; tab = r.tab; chain = r.chain;
@@ -186,9 +197,10 @@ function progress() {
   M.sync($('#s-fill,#s-table', document) || document);
 }
 function setVal(n, k, v) {
+  if (k === 'spur' && document.activeElement.dataset.neg !== undefined && /^\d/.test(v)) v = '-' + v;   // บนฟอร์มเขียนขนาด (66) · แอปเก็บ −66 dBc
   const t = S.job.tx[n - 1], f = S.job.fields.find(x => x.k === k); t.v[k] = v; if (t.pend) delete t.pend[k];   // แก้ค่าเอง = ยืนยันค่านั้นแล้ว
   later();
-  const box = document.activeElement.closest('.fld, td'); if (box) { box.querySelector('.src')?.remove(); box.classList.remove('pd'); if (f) box.classList.toggle('bad', F.bad(f, v)); }
+  const box = document.activeElement.closest('.fld, td, .fc'); if (box) { box.querySelector('.src')?.remove(); box.classList.remove('pd'); if (f) box.classList.toggle('bad', F.bad(f, v)); }
   progress();
 }
 function setM(n, rv = false) {   // rv = เปลี่ยนด้วยการเลื่อนการ์ด/ปุ่มถัดไป (ไม่ใช่แตะชิป)
@@ -332,7 +344,7 @@ function ctaGo() {
 
 // ---------- เหตุการณ์ ----------
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-dl-ed],[data-retry],[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-u-gen],[data-u-add],[data-u-reset],[data-u-set],[data-u-copy],[data-pre],[data-spot],[data-vo],[data-ex],[data-sopen],[data-sx],[data-more],[data-site],[data-eng],[data-eng-other],[data-travel],[data-offrd],[data-use-imp],[data-open-draft],[data-sim040],[data-chk],[data-confirm-form],[data-form-done],[data-assign],[data-file-del],[data-val-edit],[data-val-save],[data-val-ok],[data-evt],#cta,[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],[data-impjob],[data-imp-save],[data-bm-link],[data-bm-copy],#bd');
+  const t = e.target.closest('[data-fmode],[data-dl-ed],[data-retry],[data-back],.tabbar a,[data-sheet],[data-close],.sw,[data-off-act],[data-pane],[data-toast],[data-cam],[data-m],[data-nx],[data-done],[data-signout],[data-u-gen],[data-u-add],[data-u-reset],[data-u-set],[data-u-copy],[data-pre],[data-spot],[data-vo],[data-ex],[data-sopen],[data-sx],[data-more],[data-site],[data-eng],[data-eng-other],[data-travel],[data-offrd],[data-use-imp],[data-open-draft],[data-sim040],[data-chk],[data-confirm-form],[data-form-done],[data-assign],[data-file-del],[data-val-edit],[data-val-save],[data-val-ok],[data-evt],#cta,[data-share],[data-peek],[data-pw-save],[data-recheck],[data-be],[data-file],[data-photo-del],[data-sel],[data-impjob],[data-imp-save],[data-bm-link],[data-bm-copy],#bd');
   if (!t) return; const d = t.dataset;
   if (d.pre) { const [k, v] = d.pre.split(':'); S.ui[k] = v; S.rev++; }
   if ('vo' in d) { S.ui.vo = !t.parentNode.open; return; }
@@ -378,6 +390,7 @@ document.addEventListener('click', e => {
     const on = t.getAttribute('aria-checked') !== 'true'; t.setAttribute('aria-checked', on); $('span', t).textContent = on ? 'เปิด' : 'ปิด';
     if (d.off) { store.setOffline(d.off, on); S.rev++; draw(); } else if (d.pref) store.pref(d.pref, on); 
   }
+  else if ('fmode' in d) { store.pref('fmode', d.fmode || null); history.replaceState(null, '', `#/pm/${S.job.id}/fill`); S.rev++; draw(); }   // ช่องกรอก | บนฟอร์ม (จำไว้ครั้งหน้า)
   else if (d.dlEd) {   // ไฟล์แก้ได้ (Word/Excel) ของเอกสารที่รวมกับ PDF: ขอ signed URL ตอนกดแล้วดาวน์โหลด
     const it = V.viewItem(S, d.dlEd);
     store.fileUrl(it && it.editable).then(url => url ? fetch(url) : Promise.reject()).then(r => r.ok ? r.blob() : Promise.reject())   // โหลดเป็น blob แล้วบันทึก: ไม่ออกจากแอป ไม่พึ่ง header ของ Storage

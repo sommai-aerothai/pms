@@ -5,6 +5,7 @@ import * as F from './flow.js';
 import { ORDER } from './data/schedule-2569.js';
 import { ATTACH_69 } from './data/wi-scope.js';
 import { DOC_GROUPS } from './shapes.js';
+import { map202, cells202, PDF202 } from './report/fm202.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 export const ic = (n, c = '') => `<svg class="ic ${c}"><use href="./ui/icons.svg#i-${n}"/></svg>`;
@@ -133,9 +134,9 @@ export function rounds(S, arg, back) {
   return `${nav(t, back)}<div class="in"><h1 class="lt">${esc(t)}</h1><div class="grp">${roundsList(S, list, location.hash.split('/doc/')[0] || RB)}</div></div>`;
 }
 // ตัวดูไฟล์: storagePath = ไฟล์จริงจาก bucket ของชนิดข้อมูล (signed URL · app.js signView) · ไม่มีไฟล์ในระบบ = เปิดจากเว็บกอง (sourceUrl)
-// iPhone/iPad แสดง PDF ใน iframe ได้แค่หน้าแรก → แคปซูลเปิดแท็บใหม่แทน · ไม่รู้จำนวนหน้า = ไม่แสดงเลขหน้า
+// PDF วาดในหน้าด้วย pdf.js (pdfview.js · app.js mountPdf) · iframe ใช้ไม่ได้: iPhone/iPad แสดงแค่หน้าแรก · ไม่รู้จำนวนหน้า = ไม่แสดงเลขหน้า
 export const viewItem = (S, id) => S.docs.find(x => x.id === id) || S.files.find(x => x.id === id) || S.templates.find(x => x.code === id);
-const isIOS = () => typeof navigator !== 'undefined' && (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform)));
+const OPENING = `<div class="grp"><div class="p16">${st('sync', 'กำลังเปิดไฟล์…')}</div></div>`;
 const WEB_NOTE = 'เปิดจากเว็บกอง (ต้องอยู่ในเน็ตบริษัท)';
 const extLink = (href, label, c = '') => `<a class="btn ${c}" href="${esc(href)}" target="_blank" rel="noopener">${ic('ext')}${label}</a>`;
 const kb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
@@ -152,11 +153,10 @@ export function view(S, id, back) {
   const badge = d && d.origin !== 'app' ? `<div class="vbd">${BADGE}</div>` : '';
   let body;
   if (it.storagePath) body = `<div class="in" data-vfile>${badge}${u.url && fext(it) && fext(it) !== 'pdf' ? `<div class="grp"><div class="p16"><b>ไฟล์ ${esc(fext(it).toUpperCase())}</b>${it.size ? `<div class="sec">${kb(it.size)}</div>` : ''}<div class="sec">เปิดดูบนหน้าเว็บไม่ได้ · ดาวน์โหลดไปเปิดในเครื่อง</div></div></div><div class="pad2">${dlBtn(u.url, 'ดาวน์โหลด')}${it.sourceUrl ? extLink(it.sourceUrl, 'เปิดบนเว็บกอง', 'alt') : ''}</div>`
-      : u.url ? (isIOS() ? `<div class="grp"><div class="p16">${st('app', 'ไฟล์พร้อมเปิด')}</div></div><div class="pad2">${extLink(u.url, 'เปิดไฟล์ในแท็บใหม่')}</div>`
-      : `<iframe class="vfile" src="${esc(u.url)}" title="${esc(title)}"></iframe><div class="pad2">${extLink(u.url, 'เปิดในแท็บใหม่', 'alt')}</div>`)
+      : u.url ? `<div class="pdfv" data-pdf="${esc(u.url)}" aria-label="${esc(title)}">${OPENING}</div><div class="pad2">${extLink(u.url, 'เปิดในแท็บใหม่', 'alt')}</div>`
     + (it.editable ? `<div class="pad2"><button class="btn alt" data-dl-ed="${esc(id)}">${ic('dl')}ดาวน์โหลดไฟล์แก้ได้ (Word/Excel)</button></div>` : '')
     : u.err ? `<div class="grp">${errBody(u.err, 'file:' + id)}</div><div class="pad2">${errMore([['ไฟล์', u.err]])}</div>${it.sourceUrl ? `<div class="pad2">${extLink(it.sourceUrl, 'เปิดบนเว็บกอง', 'alt')}<p class="sec note c">${WEB_NOTE}</p></div>` : ''}`
-    : `<div class="grp"><div class="p16">${st('sync', 'กำลังเปิดไฟล์…')}</div></div>`}</div>`;
+    : OPENING}</div>`;
   else if (it.sourceUrl) body = `<div class="in"><div class="grp"><div class="p16">${st('web', WEB_NOTE)}</div></div><div class="pad2">${extLink(it.sourceUrl, 'เปิดบนเว็บกอง')}</div></div>${fake ? `<div class="pages" data-pg="${pg}">${badge}${fake}<div class="pgbar">หน้า <span id="pn">1</span>/${pg}</div></div>` : ''}`;
   else body = fake ? `<div class="pages" data-pg="${pg}">${badge}${fake}<div class="pgbar">หน้า <span id="pn">1</span>/${pg}</div></div>` : `<div class="in">${badge}<div class="empty">ยังไม่มีไฟล์นี้ในระบบ</div></div>`;
   return `${nav(title, back, `<button data-sheet="${d ? 'info' : 'src'}:${esc(id)}" aria-label="${d ? 'ข้อมูลรายงาน' : 'ที่มาเอกสาร'}">${ic('info')}</button><button data-share aria-label="แชร์">${ic('share')}</button>`)}${body}`;
@@ -314,7 +314,7 @@ const confirmBar = j => { const p = F.formProg(j, j.forms.find(f => f.kind === '
 export function fill(S, _, back) {
   const j = S.job, m = j.cur, t = j.tx[m - 1], k = txDoneCount(j);
   const chips = j.tx.map(x => { const d = txDone(j, x), c = x.n === m; return `<button class="chip ${c ? 'cur' : d ? 'dn' : ''}" data-m="${x.n}" aria-label="Tx ${x.n}, ${x.freq} MHz, ${c ? 'ปัจจุบัน' : d ? 'เสร็จแล้ว' : 'ยังไม่ทำ'}"><b>${d ? ic('done') : ''}Tx ${x.n}</b><small>${x.freq.toFixed(x.freq % 1 ? 2 : 1).replace(/(\.\d)0$/, '$1')} MHz</small></button>`; }).join('');
-  return `${nav(`เครื่องส่ง ${m}/${j.tx.length}`, back)}<div class="in"><div class="strip-w"><div class="strip" id="strip">${chips}</div>
+  return `${nav(`เครื่องส่ง ${m}/${j.tx.length}`, back)}<div class="in">${modeSeg(false)}<div class="strip-w"><div class="strip" id="strip">${chips}</div>
  <div class="prg"><span class="cap">${m} จาก ${j.tx.length} · เสร็จ <span class="cnt" data-v="${k}">${k}</span></span><div class="bar3"><i style="width:${100 * k / j.tx.length}%"></i></div></div></div>
  <div class="sh">ข้อมูลเครื่อง · อ่านจากสติกเกอร์</div><div class="grp">${idFld(S, t, m, 'asset', 'Asset No', 'จากสติกเกอร์ทรัพย์สิน')}${idFld(S, t, m, 'serial', 'Serial', 'จากแผ่นป้ายเครื่อง')}</div>
  <div class="sh">ค่าที่วัด</div><div class="grp">${j.fields.map(f => fld(S, f, t, m)).join('')}</div>${evidence(S, j)}${confirmBar(j)}</div>`;
@@ -323,13 +323,39 @@ const wiText = `<div class="grp"><div class="p16"><div class="cap">ขั้น�
 export function table(S, _, back) {
   const j = S.job, m = j.cur, k = txDoneCount(j), cols = j.fields, pd = exampleOf(S, j) || S.docs[0];
   const body = j.tx.map(t => `<tr><td>${t.n}</td>${cols.map(f => `<td${bad(f, t.v[f.k] ?? '') ? ' class="bad"' : t.pend && t.pend[f.k] ? ' class="pd"' : ''}><input inputmode="decimal" enterkeyhint="next" value="${esc(t.v[f.k] ?? '')}" data-n="${t.n}" data-k="${f.k}" aria-label="Tx ${t.n} ${esc(f.n)}"></td>`).join('')}</tr>`).join('');
-  return `${nav(`FM-CE.SE-202 · เครื่องส่ง ${j.tx.length} เครื่อง`, back)}<div class="tb2"><div class="tl"><div class="prg pt2"><span class="cap">${m} จาก ${j.tx.length} · เสร็จ <span class="cnt" data-v="${k}">${k}</span></span><div class="bar3"><i style="width:${100 * k / j.tx.length}%"></i></div></div>
+  return `${nav(`FM-CE.SE-202 · เครื่องส่ง ${j.tx.length} เครื่อง`, back)}${modeSeg(false)}<div class="tb2"><div class="tl"><div class="prg pt2"><span class="cap">${m} จาก ${j.tx.length} · เสร็จ <span class="cnt" data-v="${k}">${k}</span></span><div class="bar3"><i style="width:${100 * k / j.tx.length}%"></i></div></div>
  ${confirmBar(j)}<table><thead><tr><th>Tx</th>${cols.map(f => `<th>${esc(f.n).replace(' (', '<br>(')}</th>`).join('')}</tr></thead><tbody id="tbd">${body}</tbody></table><p class="sec">Apple Pencil เขียนลงช่องได้เลย (Scribble) · ช่องขอบประ = เติมจากไฟล์ รอยืนยัน (แก้ค่าหรือกดยืนยันทั้งหมด)</p></div>
  <div class="wi"><div class="grp">${idFld(S, j.tx[m - 1], m, 'asset', `Asset No · Tx ${m}`, 'จากสติกเกอร์ทรัพย์สิน').replace('<input ', '<input id="wiAsset" ')}</div>
  <div class="seg"><button data-pane="w-wi" aria-pressed="true">WI</button><button data-pane="w-pr" aria-pressed="false">รอบก่อน</button><button data-pane="w-pdf" aria-pressed="false">ฟอร์ม PDF</button></div>
  <div class="pane" id="w-wi"><div class="p16"><b>WI-CE.SE-002 Rev.06 · ภาคผนวก ข</b><div class="sec" id="wf">ช่องที่เลือก: ${esc(cols[2].n)} · Tx ${m}</div></div><div class="page w70"><div class="hd"><i></i><span>WI-CE.SE-002 · หน้า 50</span></div><div class="ln"></div></div>${wiText}</div>
  <div class="pane" id="w-pr" hidden><div class="p16"><a class="btn alt" href="#/pm/${j.id}/doc/${pd.id}">${ic('doc')}เปิดรายงานรอบก่อน (${esc(pd.title)})</a></div></div>
  <div class="pane" id="w-pdf" hidden><div class="page"><div class="hd"><i></i><span>FM-CE.SE-202 Rev.04</span></div><div class="ln"></div></div></div></div></div>`;
+}
+// ---------- กรอกบนฟอร์ม: PDF ฟอร์มจริงของเว็บกอง + ช่องกรอกทับตำแหน่งในฟอร์ม (ค่าเดียวกับ "ช่องกรอก" · Apple Pencil เขียนลงช่องได้ = Scribble) ----------
+// ตำแหน่งวัดจาก Rev.03 → ใช้เฉพาะ PDF Rev.03 (เว็บกองขึ้น Rev ใหม่ = ต้องวัดใหม่ ไม่วางช่องผิดที่)
+const isPdf = x => /\.pdf$/i.test(x.storagePath || '');
+const latest202 = S => S.files.filter(x => x.code === 'FM-CE.SE-202' && x.rev).sort((a, b) => b.rev.localeCompare(a.rev, 'en', { numeric: true }) || isPdf(b) - isPdf(a))[0];   // Rev เดียวกัน = PDF ก่อน
+export const form202 = S => { const x = latest202(S); return x && x.rev === '03' && isPdf(x) ? x : null; };   // Rev ล่าสุดเท่านั้น · ไม่ใช่ 03 = ไม่วางช่อง
+const modeSeg = on => `<div class="seg"><button data-fmode="" aria-pressed="${!on}">ช่องกรอก</button><button data-fmode="form" aria-pressed="${on}">บนฟอร์ม</button></div>`;
+export function form(S, _, back) {
+  const j = S.job, it = form202(S), u = (it && S.urls[it.id]) || {}, k = txDoneCount(j);
+  const cur = !it && latest202(S), newer = cur && cur.rev !== '03';   // Rev ล่าสุดไม่ใช่ 03 = เว็บกองขึ้น Rev ใหม่ ต้องวัดตำแหน่งช่องใหม่ก่อน
+  const body = !it ? `<div class="empty">${newer ? `เว็บกองใช้ FM-CE.SE-202 Rev.${esc(cur.rev)} แล้ว · ตำแหน่งช่องบนฟอร์มทำไว้สำหรับ Rev.03 ต้องปรับก่อน` : 'ยังไม่มี PDF ของ FM-CE.SE-202 Rev.03 ในระบบ'} · ใช้ "ช่องกรอก" ไปก่อน</div>`
+    : u.url ? `<div class="pdfv form" data-pdf="${esc(u.url)}" data-form="202">${OPENING}</div>`
+    : u.err ? `<div class="grp">${errBody(u.err, 'file:' + it.id)}</div>` : OPENING;
+  return `${nav(`FM-CE.SE-202 · เครื่องส่ง ${j.tx.length} เครื่อง`, back)}<div class="in">${modeSeg(true)}<div class="prg"><span class="cap">${j.cur} จาก ${j.tx.length} · เสร็จ <span class="cnt" data-v="${k}">${k}</span></span><div class="bar3"><i style="width:${100 * k / j.tx.length}%"></i></div></div>
+ <p class="sec">แตะช่องเพื่อพิมพ์ หรือเขียนด้วย Apple Pencil ลงช่องได้เลย · ช่องสีฟ้า = กรอกได้ · Freq/Model มาจากงาน</p></div>${body}`;
+}
+const pct = (a, b) => (100 * a / b).toFixed(3) + '%';
+const at = ([x, y, w, h]) => `left:${pct(x, PDF202.w)};top:${pct(y, PDF202.h)};width:${pct(w, PDF202.w)};height:${pct(h, PDF202.h)}`;
+// HTML วางทับสำเนาหน้าที่ c (0 = Tx 1–20) · หัวฟอร์ม/ผู้ปฏิบัติ = ข้อความเดียวกับที่รายงาน Excel ใช้ (map202)
+export function formOver(S, c) {
+  const j = S.job, e = map202(j).edits['Page 1'] || {}, txt = (b, s, cl = '') => s ? `<span class="fc ro ${cl}" style="${at(b)}">${esc(s)}</span>` : '';
+  return txt(PDF202.head, e.A4, 'l') + txt(PDF202.crew, e.A27, 'l') + `<span class="fc ro xs" style="${at(PDF202.sensHead)}">Sens<br>dBm<br>(แอป)</span>` + cells202(j, c).map(x => {
+    if (x.ro) return x.col === 'A' && !c ? '' : txt([x.x, x.y, x.w, x.h], x.v);   // สำเนาแรก NO พิมพ์ในฟอร์มแล้ว
+    const neg = x.k === 'spur', v = neg && /^-\d/.test(x.v) ? x.v.slice(1) : x.v, name = x.f ? x.f.n : x.label || (x.k === 'asset' ? 'Asset No' : 'Serial');
+    return `<label class="fc${x.f && bad(x.f, x.v) ? ' bad' : ''}" style="${at([x.x, x.y, x.w, x.h])}"><input ${x.num ? 'inputmode="decimal"' : 'autocapitalize="characters"'} enterkeyhint="next" autocomplete="off" spellcheck="false" value="${esc(v)}" data-n="${x.n}" data-k="${x.k}"${neg ? ' data-neg' : ''} aria-label="Tx ${x.n} ${esc(name)}"></label>`;
+  }).join('');
 }
 export function asset(S, _, back) {
   const j = S.job;
