@@ -155,4 +155,52 @@ ok(na.code === 'auth' && hit === 0, 'ไม่มี session → auth (ไม่
   ok((await be.getCatalog()).examples.length === 1500, 'getCatalog: นับ examples ครบทุกหน้า (จำนวน/ปีต่อระบบไม่ขาด)');
 }
 
+// ---------- แอดมินจัดการผู้ใช้ (Edge Function admin-users) ----------
+{
+  localStorage.setItem('pms.backend', 'supabase');
+  localStorage.setItem('pms.session', JSON.stringify({ access_token: 'T', refresh_token: 'R', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'u1' } }));
+  const calls = []; let mode = 'ok';
+  globalThis.fetch = async (u, o) => {
+    const p = new URL(u).pathname; calls.push({ p, h: o.headers, b: o.body && JSON.parse(o.body) });
+    if (p !== '/functions/v1/admin-users') return json([]);
+    if (mode === '404') return json({ code: 'NOT_FOUND', message: 'Requested function was not found' }, 404);
+    if (mode === '403') return json({ error: 'forbidden' }, 403);
+    if (mode === 'ta') return json({ error: 'target_admin' }, 403);
+    if (mode === 'pt') return json({ error: 'partial' }, 500);
+    if (mode === '409') return json({ error: 'exists' }, 409);
+    if (mode === '400') return json({ error: 'username' }, 400);
+    if (mode === 'nf') return json({ error: 'notfound' }, 404);
+    const b = JSON.parse(o.body); return json(b.action === 'list' ? { users: [{ id: 'a', username: 'x.y', name: 'X', approved: true, is_admin: false, last_sign_in_at: null }] } : { ok: true });
+  };
+  const code = async f => { try { await f(); return 'none'; } catch (e) { return e.code + (e.field ? ':' + e.field : ''); } };
+  const L = await store.adminUsers('list');
+  ok(L.users.length === 1 && calls.at(-1).p === '/functions/v1/admin-users' && calls.at(-1).b.action === 'list' && calls.at(-1).h.Authorization === 'Bearer T' && calls.at(-1).h.apikey === CONFIG.anonKey, 'adminUsers list: POST /functions/v1/admin-users + apikey + Bearer');
+  const n0 = calls.length;
+  await store.adminUsers('create', { username: 'somchai.k', name: ' สมชาย ', password: 'abcdefghij' });
+  ok(calls.length === n0 + 1 && calls.at(-1).b.action === 'create' && calls.at(-1).b.username === 'somchai.k', 'adminUsers create: ส่งถึงฟังก์ชัน');
+  ok(await code(() => store.adminUsers('create', { username: 'Bad Name', name: 'x', password: 'abcdefghij' })) === 'invalid:username', 'create: ชื่อผู้ใช้ผิดรูป → invalid:username ฝั่งแอป');
+  ok(await code(() => store.adminUsers('create', { username: 'ab', name: 'x', password: 'abcdefghij' })) === 'invalid:username', 'create: ชื่อผู้ใช้สั้นเกิน → invalid:username');
+  ok(await code(() => store.adminUsers('create', { username: 'somchai.k', name: ' ', password: 'abcdefghij' })) === 'invalid:name', 'create: ไม่มีชื่อ → invalid:name');
+  ok(await code(() => store.adminUsers('create', { username: 'somchai.k', name: 'x', password: '123456789' })) === 'invalid:password', 'create: รหัสสั้น (9) → invalid:password');
+  ok(await code(() => store.adminUsers('reset', { id: 'a', password: 'short' })) === 'invalid:password', 'reset: รหัสสั้น → invalid:password');
+  ok(calls.length === n0 + 1, 'ข้อมูลไม่ผ่านการตรวจ = ไม่ยิงเครือข่ายเลย');
+  mode = '404'; ok(await code(() => store.adminUsers('list')) === 'notdeployed', '404 ของ gateway → notdeployed');
+  mode = 'nf'; ok(await code(() => store.adminUsers('set', { id: 'a', approved: false })) === 'notfound', '404 ของฟังก์ชันเอง (ไม่พบบัญชี) ≠ notdeployed');
+  mode = '403'; ok(await code(() => store.adminUsers('list')) === 'forbidden', '403 → forbidden (ไม่ใช่ auth: ห้ามเตะออกจากระบบ)');
+  mode = 'ta'; ok(await code(() => store.adminUsers('reset', { id: 'a', password: 'abcdefghij' })) === 'target_admin', '403 + target_admin → target_admin (ไม่ใช่ forbidden)');
+  mode = 'pt'; ok(await code(() => store.adminUsers('create', { username: 'a.b.c', name: 'x', password: 'abcdefghij' })) === 'partial', '500 + partial → partial');
+  mode = '409'; ok(await code(() => store.adminUsers('list')) === 'exists', '409 → exists');
+  mode = '400'; ok(await code(() => store.adminUsers('list')) === 'invalid:username', '400 + {error:username} → invalid:username');
+  const pws = Array.from({ length: 200 }, () => store.genPassword());
+  ok(pws.every(p => /^[A-HJ-NP-Za-km-z2-9]{12}$/.test(p)) && new Set(pws).size === 200, 'genPassword: 12 ตัว ไม่มีตัวสับสน ไม่ซ้ำ (200 ครั้ง)');
+  // demo: จำลองในหน่วยความจำ
+  localStorage.setItem('pms.backend', 'demo');
+  const before = (await store.adminUsers('list')).users.length;
+  await store.adminUsers('create', { username: 'new.user', name: 'ใหม่', password: 'abcdefghij' });
+  const after = (await store.adminUsers('list')).users;
+  ok(after.length === before + 1 && after.at(-1).username === 'new.user' && after.at(-1).approved && !JSON.stringify(after).includes('abcdefghij'), 'demo: สร้างแล้วอยู่ในรายการ · ไม่เก็บรหัสผ่าน');
+  ok(await code(() => store.adminUsers('create', { username: 'new.user', name: 'x', password: 'abcdefghij' })) === 'exists', 'demo: ชื่อซ้ำ → exists');
+  await store.adminUsers('set', { id: after.at(-1).id, approved: false }); ok((await store.adminUsers('list')).users.at(-1).approved === false, 'demo: ปิดการใช้งานได้');
+}
+
 console.log(`\n${n} ข้อ · ${process.exitCode ? 'มีข้อไม่ผ่าน' : 'ผ่านทั้งหมด'}`);

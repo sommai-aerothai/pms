@@ -42,6 +42,22 @@ export async function refresh() {
   try { return keep(await call('/auth/v1/token?grant_type=refresh_token', { method: 'POST', auth: false, body: { refresh_token: s.refresh_token } })); }
   catch (e) { if (e.code !== 'offline') localStorage.removeItem(SK); throw e; }   // offline = เก็บ session ไว้ · ปฏิเสธจริง = ล้าง
 }
+// แอดมินจัดการผู้ใช้ผ่าน Edge Function admin-users (ดู backend/edge/README.md) · คืน JSON ของฟังก์ชัน
+// รหัสผิดพลาด: notdeployed = ฟังก์ชันยังไม่ถูก deploy (404 ของ gateway) · forbidden = ไม่ใช่แอดมิน (403 ห้ามเตะออกจากระบบ) · exists = ชื่อซ้ำ · invalid + field = ข้อมูลไม่ผ่าน
+// ฟังก์ชันตอบ 404 ของตัวเองเป็น {error:'notfound'} (detail='notfound') ต่างจาก gateway ที่ตอบ NOT_FOUND
+export const adminUsers = async (action, body = {}) => {
+  try { return await call('/functions/v1/admin-users', { method: 'POST', body: { ...body, action } }); }
+  catch (e) {
+    if (e.path !== '/functions/v1/admin-users') throw e;   // offline/server config ฯลฯ ที่ไม่ได้มาจากฟังก์ชัน
+    const { code, retryAfter, ...m } = e;   // เก็บ status/path/detail ไว้วินิจฉัย (code ใหม่ต้องไม่ถูกทับ)
+    if (e.status === 404 && e.detail !== 'notfound') fail('notdeployed', 0, m);
+    if (e.status === 403) fail(e.detail === 'target_admin' ? 'target_admin' : 'forbidden', 0, m);   // target_admin = จัดการบัญชีแอดมินอื่นไม่ได้
+    if (e.detail === 'partial') fail('partial', 0, m);   // สร้างไม่สำเร็จและลบบัญชีครึ่งทางไม่ได้
+    if (e.status === 409) fail('exists', 0, m);
+    if (e.status === 400 || e.status === 413) fail('invalid', 0, { ...m, field: ['username', 'name', 'password'].includes(e.detail) ? e.detail : undefined });
+    throw e;
+  }
+};
 export const signOut = async () => { try { localStorage.removeItem(SK); } catch {} };
 export const me = async () => { const s = session(); if (!s) fail('auth'); const [p] = await rest(`profiles?id=eq.${s.user.id}&select=*`); return p || fail('notfound'); };   // p.approved=false → หน้า "รออนุมัติ"
 

@@ -373,7 +373,7 @@ export function tools(S, _, back) {
 export function me(S) {
   const r = (i, t, s) => `<button class="row" data-toast="โหมดตัวอย่าง · ยังไม่เปิดใช้">${ic(i, 'lead')}<span class="rt"><span>${t}</span><span class="sub">${s}</span></span>${chev}</button>`, auto = store.pref('auto') !== false;
   return `${nav('ฉัน')}<div class="in"><h1 class="lt">ฉัน</h1><div class="hero"><div class="avatar">${esc([...S.user.name][0])}</div><div class="big">${esc(S.user.name)}</div><div class="sec">${esc(S.user.email || 'CE.SE · AEROTHAI')}</div></div>
- <div class="grp">${r('ok', 'บัญชีบริษัท', store.backendName() === 'demo' ? 'โหมดตัวอย่าง · ยังไม่เชื่อมต่อ' : S.user.email || '')}${store.backendName() === 'demo' ? '' : `<button class="row" data-sheet="pw">${ic('lock', 'lead')}<span class="rt"><span>เปลี่ยนรหัสผ่าน</span></span>${chev}</button>`}${r('sig', 'ลายเซ็นของฉัน', 'ใช้ตอนออกรายงาน')}${r('gear', 'ตั้งค่า', 'แจ้งเตือนรอบ PM · calibration')}</div>
+ <div class="grp">${r('ok', 'บัญชีบริษัท', store.backendName() === 'demo' ? 'โหมดตัวอย่าง · ยังไม่เชื่อมต่อ' : S.user.email || '')}${store.backendName() === 'demo' ? '' : `<button class="row" data-sheet="pw">${ic('lock', 'lead')}<span class="rt"><span>เปลี่ยนรหัสผ่าน</span></span>${chev}</button>`}${r('sig', 'ลายเซ็นของฉัน', 'ใช้ตอนออกรายงาน')}${S.user.is_admin ? `<a class="row" href="#/me/users">${ic('gear', 'lead')}<span class="rt"><span>ตั้งค่า</span><span class="sub">ผู้ใช้ · แจ้งเตือนรอบ PM · calibration</span></span>${chev}</a>` : r('gear', 'ตั้งค่า', 'แจ้งเตือนรอบ PM · calibration')}</div>
  <div class="sh">เชื่อมต่อ</div><div class="grp"><a class="row" href="#/me/sarabun">${ic('doc', 'lead')}<span class="rt"><span>เชื่อมสารบรรณ</span><span class="sub">ส่งบันทึกงานเข้า PMS ด้วยคำสั่งลัดหรือปุ่มใน Safari</span>${sarStat()}</span>${chev}</a><div class="kv"><span>เซิร์ฟเวอร์: ${store.backendName() === 'demo' ? 'ตัวอย่าง (demo)' : 'Supabase'}</span><button class="btn alt" data-be="${store.backendName() === 'demo' ? 'supabase' : 'demo'}">สลับเป็น ${store.backendName() === 'demo' ? 'Supabase' : 'demo'}</button></div></div>
  <div class="sh">พื้นที่ offline</div><div class="grp"><div class="kv"><span>ตั้งเก็บ offline อัตโนมัติ · ตัวอย่าง (ยังไม่โหลดไฟล์จริง)</span>${sw(auto, 'data-pref="auto" aria-label="ตั้งเก็บ offline อัตโนมัติ (ตัวอย่าง)"')}</div><div class="kv"><span>ตั้งไว้ในเครื่อง</span><span>${store.offlineCount()} รายการ</span></div></div>
  <div class="grp">${r('info', 'เกี่ยวกับ / เวอร์ชัน', `${S.version} (${store.backendName()})`)}</div>
@@ -422,7 +422,18 @@ function sarabun(S, _, back) {
   ${stp(2, 'doc', 'เปิดหนังสือในสารบรรณ', 'ล็อกอินด้วยบัญชีของคุณ → เปิดหนังสือ → "พิมพ์บันทึกงาน"', 'พิมพ์บันทึกงาน')}
   ${stp(3, 'ok', 'คลิกบุ๊กมาร์ก "ส่งเข้า PMS"', 'หน้าต่างแอปเปิดพร้อมข้อมูล · ตรวจแล้วกด "บันทึกเข้างาน"', 'ส่งเข้า PMS › บันทึกเข้างาน')}</div></div></div>`;
 }
-export { importScreen as import, sarabun };
+// ---------- ฉัน › ตั้งค่า › ผู้ใช้ (เฉพาะแอดมิน · เซิร์ฟเวอร์ตรวจสิทธิ์ซ้ำเสมอ) ----------
+function users(S, _, back) {
+  const U = S.users || { st: 'load' }, head = `${nav('ผู้ใช้', back)}<div class="in"><h1 class="lt">ผู้ใช้</h1>`;
+  if (U.st === 'nd') return `${head}<div class="grp"><div class="p16">${st('warn', 'ยังไม่ได้ตั้งค่าบนเซิร์ฟเวอร์ · ดูวิธีใน backend/edge/README.md')}</div></div></div>`;
+  if (U.st === 'err') return `${head}<div class="sh">โหลดผู้ใช้ไม่สำเร็จ</div><div class="grp">${errBody(U.e, 'users')}</div><div class="pad2">${errMore([['users', U.e]])}</div></div>`;
+  if (U.st === 'load') return `${head}<div class="grp"><div class="p16">${st('sync', 'กำลังโหลด…')}</div></div></div>`;
+  const rows = U.rows.map(u => { const id = esc(u.id), mine = u.id === S.user.id;
+    return `<div class="p16" data-uid="${id}"><div class="big">${esc(u.name || u.username)}</div><div class="sec">${esc(u.username)}${u.is_admin ? ' · แอดมิน' : ''}${mine ? ' · บัญชีของคุณ' : ''}${u.last_sign_in_at ? ' · เข้าล่าสุด ' + dFull(u.last_sign_in_at) : ' · ยังไม่เคยเข้า'}</div>${u.approved ? st('ok', 'ใช้งานอยู่') : st('warn', 'ปิดใช้งาน')}
+ ${mine || u.is_admin ? '' : `<div class="uact"><button class="btn sm alt" data-sheet="ureset:${id}">${ic('lock')}รีเซ็ตรหัส</button><button class="btn sm alt" data-u-set="${id}:${u.approved ? 0 : 1}">${ic(u.approved ? 'out' : 'done')}${u.approved ? 'ปิดการใช้งาน' : 'เปิดการใช้งาน'}</button></div>`}</div>`; }).join('');
+  return `${head}<div class="pad2"><button class="btn" data-sheet="uadd">${ic('plus')}เพิ่มผู้ใช้</button></div><div class="sh">${U.rows.length} บัญชี</div><div class="grp">${rows || '<div class="empty">ยังไม่มีผู้ใช้</div>'}</div></div>`;
+}
+export { importScreen as import, sarabun, users };
 
 // ---------- sheet ----------
 const frame = (t, body) => `<i class="grab"></i><div class="sh-h"><span>${t}</span><button data-close>เสร็จ</button></div>${body}`;
@@ -476,6 +487,14 @@ export function sheet(S, kind, id) {
     return h('เปลี่ยนรหัสผ่าน', `<p class="sec note">อย่างน้อย 8 ตัวอักษร</p>${f('pw1', 'รหัสผ่านใหม่')}${f('pw2', 'ยืนยันรหัสผ่านใหม่')}
  <div class="pad2"><p class="st w lg-err" id="pwErr" role="alert" hidden>${ic('warn')}<span></span></p><button class="btn" data-pw-save>บันทึก</button></div>`);
   }
+  if (kind === 'uadd' || kind === 'ureset') {
+    const f = (i, l, ex = '') => `<label class="search"><input id="${i}" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="${l}" aria-label="${l}" ${ex}></label>`;
+    const u = kind === 'ureset' ? (S.users?.rows || []).find(x => x.id === id) : null;
+    return h(u ? 'รีเซ็ตรหัส · ' + esc(u.username) : 'เพิ่มผู้ใช้', `<p class="sec note">${u ? 'ตั้งรหัสชั่วคราวใหม่ให้พนักงาน · รหัสเดิมใช้ไม่ได้ทันที' : 'บัญชีใหม่ใช้งานได้ทันที · พนักงานล็อกอินด้วยชื่อผู้ใช้ + รหัสชั่วคราว (ไม่มีสมัครเอง)'}</p>
+ ${u ? '' : `${f('uName', 'ชื่อ-นามสกุล', 'enterkeyhint="next"')}${f('uUser', 'ชื่อผู้ใช้ เช่น somchai.k (a-z 0-9 . _ -)', 'inputmode="email" enterkeyhint="next"')}`}${f('uPw', 'รหัสผ่านชั่วคราว (อย่างน้อย 10 ตัว)', 'class="mono" type="password"').replace('></label>', `><button class="peek" type="button" data-peek aria-label="Show password" aria-pressed="false">${ic('eye')}</button></label>`)}
+ <div class="pad2"><button class="btn alt" data-u-gen>${ic('sync')}สุ่มรหัส</button><p class="st w lg-err" id="uErr" role="alert" hidden>${ic('warn')}<span></span></p>
+ <button class="btn" ${u ? `data-u-reset="${esc(id)}"` : 'data-u-add'}>${u ? 'ตั้งรหัสใหม่' : 'สร้างบัญชี'}</button></div>`);
+  }
   if (kind === 'photo') {
     const j = S.job, [a, b] = id.split('.'), pid = a === 'tool' ? j.tools[+b].photo : j.tx[a - 1].photos[b], u = S.ph[pid];
     return h('รูป', `${u ? `<img class="ph-view" src="${u}" alt="">` : ''}<div class="pad2"><button class="btn alt" data-cam="${id}">${ic('cam')}ถ่ายใหม่</button><button class="btn alt" data-photo-del="${id}">${ic('trash')}ลบรูป</button></div>`);
@@ -496,3 +515,8 @@ export function sheet(S, kind, id) {
 // CTA ลอยของหน้า: [act, icon, label, soft?, frac?] · soft = ยังไม่พร้อม (เทาอ่อนสุด + วงความคืบหน้า) แตะแล้วพาไปจุดที่ค้าง
 export const jobCta = (S, j) => j.status === 'done' ? null : F.isReady(j, ctxOf(S)) ? ['report', 'doc', 'สร้างรายงาน'] : ['gap', 'doc', 'สร้างรายงาน', true, F.jobProg(j).frac];
 export const openCta = S => { const n = openNeeds(S); return n.length ? ['opengap', 'plus', 'เปิดงาน PM', true, 1 - n.length / (S.draft.off ? 4 : 2)] : ['open', 'plus', 'เปิดงาน PM']; };
+// หลังสร้าง/รีเซ็ต: โชว์รหัสชั่วคราวครั้งเดียว (อยู่ใน DOM ของ sheet เท่านั้น · ไม่เก็บใน state/localStorage · app.js ล้าง sheet ตอนปิด)
+export const newPwSheet = (username, pw) => frame('บัญชีพร้อมใช้งาน', `<div class="grp"><div class="kv"><span>ชื่อผู้ใช้</span><span>${esc(username)}</span></div>
+ <div class="p16"><div class="cap">รหัสผ่านชั่วคราว</div><div class="big mono" id="tmpPw">${esc(pw)}</div></div></div>
+ <p class="sec note">โชว์ครั้งนี้ครั้งเดียว ปิดแล้วดูอีกไม่ได้ (ลืมให้รีเซ็ตใหม่) · ส่งให้พนักงานแล้วแนะนำให้เปลี่ยนรหัสที่ ฉัน › เปลี่ยนรหัสผ่าน</p>
+ <div class="pad2"><button class="btn" data-u-copy>${ic('copy')}คัดลอก</button></div>`);

@@ -95,3 +95,18 @@ function seedLate() {
 }
 export const listJobs = async () => [seedTx(), seedLate()];
 export const getCatalog = async () => catalog;
+
+// แอดมินจัดการผู้ใช้ (จำลองในหน่วยความจำ · รีโหลดหน้า = กลับค่าเดิม · ไม่เก็บรหัสผ่านเลย)
+const users = [
+  { id: 'demo-admin', username: 'sommai.sa', name: ME, approved: true, is_admin: true, last_sign_in_at: '2026-07-28T01:00:00Z' },
+  { id: 'demo-u2', username: 'wittaya.k', name: 'วิทยา', approved: true, is_admin: false, last_sign_in_at: '2026-07-20T03:00:00Z' },
+  { id: 'demo-u3', username: 'torkiat.p', name: 'ต่อเกียรติ', approved: false, is_admin: false, last_sign_in_at: null }];
+export const adminUsers = async (action, b = {}) => {
+  const u = users.find(x => x.id === b.id), no = code => { throw { code, retryAfter: 0 }; };
+  if (action === 'list') return { users: users.map(x => ({ ...x })) };
+  if (action === 'create') { if (users.some(x => x.username === b.username)) no('exists'); const id = 'demo-' + (users.length + 1) + '-' + b.username; users.push({ id, username: b.username, name: b.name.trim(), approved: true, is_admin: false, last_sign_in_at: null }); return { id, username: b.username }; }
+  if (!u) no('notfound');
+  if (action === 'reset') return { ok: true };
+  if (action === 'set') { if (u.id === 'demo-admin' && (b.approved === false || b.is_admin === false)) no('invalid'); if (typeof b.approved === 'boolean') u.approved = b.approved; if (typeof b.is_admin === 'boolean') u.is_admin = b.is_admin; return { ok: true }; }
+  no('invalid');
+};
