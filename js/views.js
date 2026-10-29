@@ -491,7 +491,7 @@ export function sheet(S, kind, id) {
     const f = (i, l, ex = '') => `<label class="search"><input id="${i}" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="${l}" aria-label="${l}" ${ex}></label>`;
     const u = kind === 'ureset' ? (S.users?.rows || []).find(x => x.id === id) : null;
     return h(u ? 'รีเซ็ตรหัส · ' + esc(u.username) : 'เพิ่มผู้ใช้', `<p class="sec note">${u ? 'ตั้งรหัสชั่วคราวใหม่ให้พนักงาน · รหัสเดิมใช้ไม่ได้ทันที' : 'บัญชีใหม่ใช้งานได้ทันที · พนักงานล็อกอินด้วยชื่อผู้ใช้ + รหัสชั่วคราว (ไม่มีสมัครเอง)'}</p>
- ${u ? '' : `${f('uName', 'ชื่อ-นามสกุล', 'enterkeyhint="next"')}${f('uUser', 'ชื่อผู้ใช้ เช่น somchai.k (a-z 0-9 . _ -)', 'inputmode="email" enterkeyhint="next"')}`}${f('uPw', 'รหัสผ่านชั่วคราว (อย่างน้อย 10 ตัว)', 'class="mono"')}
+ ${u ? '' : `${f('uName', 'ชื่อ-นามสกุล', 'enterkeyhint="next"')}${f('uUser', 'ชื่อผู้ใช้ เช่น somchai.k (a-z 0-9 . _ -)', 'inputmode="email" enterkeyhint="next"')}`}${f('uPw', 'รหัสผ่านชั่วคราว (อย่างน้อย 10 ตัว)', 'class="mono" type="password"').replace('></label>', `><button class="peek" type="button" data-peek aria-label="Show password" aria-pressed="false">${ic('eye')}</button></label>`)}
  <div class="pad2"><button class="btn alt" data-u-gen>${ic('sync')}สุ่มรหัส</button><p class="st w lg-err" id="uErr" role="alert" hidden>${ic('warn')}<span></span></p>
  <button class="btn" ${u ? `data-u-reset="${esc(id)}"` : 'data-u-add'}>${u ? 'ตั้งรหัสใหม่' : 'สร้างบัญชี'}</button></div>`);
   }
