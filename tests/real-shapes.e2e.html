@@ -57,8 +57,8 @@ async function walk(be, A) {
     for (const r of rows) {
       const fid = decodeURIComponent(r.getAttribute('href').split('/doc/')[1]), row = DOCUMENTS.find(x => String(x.id) === fid);
       if (!fileDone && row.storage_path) {
-        await tap(A, r); const ifr = await until(() => A.$('#s-view.on iframe.vfile')); if (!ifr) lines.push('  ↳ ตัวดู: ' + A.w.location.href + ' ' + A.f.contentWindow.location.href + ' ' + (A.$('#s-view') || {}).innerHTML?.slice(0, 900) + ' errs=' + A.w.__errs);
-        ok(ifr && ifr.src.startsWith(CONFIG.supabaseUrl + '/storage/v1/object/sign/docs/') && SIGNED.at(-1) === '/storage/v1/object/sign/docs/' + row.storage_path, `${be}: ไฟล์ในระบบ → signed URL จาก bucket docs → iframe (${row.kind})`);
+        await tap(A, r); const ifr = await until(() => A.$('#s-view.on [data-pdf]')); if (!ifr) lines.push('  ↳ ตัวดู: ' + A.w.location.href + ' ' + A.f.contentWindow.location.href + ' ' + (A.$('#s-view') || {}).innerHTML?.slice(0, 900) + ' errs=' + A.w.__errs);
+        ok(ifr && ifr.dataset.pdf.startsWith(CONFIG.supabaseUrl + '/storage/v1/object/sign/docs/') && SIGNED.at(-1) === '/storage/v1/object/sign/docs/' + row.storage_path, `${be}: ไฟล์ในระบบ → signed URL จาก bucket docs → ตัวแสดง PDF ในหน้า (${row.kind})`);
         ok(A.$('#s-view a.btn[target=_blank]') && !A.$('#s-view .pgbar'), `${be}: มีปุ่มเปิดแท็บใหม่ · ไม่มีเลขหน้าปลอม`);
         A.$('#s-view [data-sheet^="src:"]').click(); const sh = await until(() => A.$('#sheet.open'));
         ok(sh && sh.querySelector(`a.btn[href="${row.source_url}"]`), `${be}: "เปิดบนเว็บกอง" = ลิงก์จริง`); A.$('#sheet [data-close]')?.click(); await sleep(100);

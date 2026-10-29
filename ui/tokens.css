@@ -6,6 +6,7 @@
 --accent:hsl(var(--accent-h) 100% var(--accent-l));--accent-on-fill:#fff;--accent-text:hsl(var(--accent-h) 100% var(--accent-tl));
 --done:#14883b;--warn:#bf5900;--danger:#d70015;--press:#d1d1d6;--bar:rgba(242,242,247,.88);--seg:#e3e3e8;
 --idle-fill:#e5e5ea;--idle-ink:#3a3a3c;--paper-bg:#c7c7cc;--paper:#fff;--paper-ink:#000;--paper-ink-2:#595959;--paper-line:#c7c7cc;--paper-fill:#d9d9de;
+--form-min-w:1420px;--form-fs:max(16px,1.15cqw);--form-cell:hsl(var(--accent-h) 100% 46.5% / .1);--form-focus:hsl(var(--accent-h) 100% 40%);--form-bad:#bf5900;   /* กรอกบนฟอร์ม: กระดาษขาวเสมอ (สีคงที่ทั้งโหมดมืด) · ตัวอักษร ≥16px กัน iOS ซูมตอนแตะช่อง → หน้ากว้างขั้นต่ำ */
 --white:#fff;--black:#000;--scrim:rgba(0,0,0,.4);
 --dock-solid:#fff;--dock-glass:rgba(255,255,255,.85);--dock-border:rgba(0,0,0,.08);
 --shadow-push:-8px 0 24px rgba(0,0,0,.12);--shadow-dock:0 8px 24px rgba(0,0,0,.12);--shadow-knob:0 1px 3px rgba(0,0,0,.3);--shadow-paper:0 2px 8px rgba(0,0,0,.25);

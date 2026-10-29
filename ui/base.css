@@ -216,7 +216,14 @@ td.bad::after{content:"⚠︎ เกินช่วง";display:block;text-align
 .pad #s-reports>.in{max-width:none;margin:0}
 .pad #s-reports>.in .seg{max-width:var(--u-420)}
 .stl{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2)}
-.vfile{display:block;width:100%;height:var(--viewer-h);border:0;border-radius:var(--radius-card);background:var(--paper-bg)}
+.pdfv{display:grid;gap:var(--space-3);padding:0 var(--space-4)}
+.pp{position:relative;container-type:inline-size;background:var(--paper);box-shadow:var(--shadow-paper)}.pp canvas{display:block;width:100%;height:100%}
+.pdfv.form{overflow-x:auto;padding-bottom:var(--space-4)}.pdfv.form .pp{min-width:var(--form-min-w)}
+.fc{position:absolute;display:flex;align-items:center;justify-content:center;font-size:var(--form-fs);color:var(--paper-ink);line-height:1;white-space:nowrap}
+.fc.ro{background:var(--paper);overflow:hidden}.fc.l{justify-content:flex-start}.fc.xs{font-size:var(--fs-micro);line-height:1.2;text-align:center;white-space:normal;outline:var(--hair) dashed var(--paper-ink-2)}
+.fc input{width:100%;height:100%;padding:0 2px;border:0;border-radius:0;background:var(--form-cell);color:var(--paper-ink);font:inherit;text-align:center}
+.fc input:focus{outline:2px solid var(--form-focus);outline-offset:0;background:var(--paper)}
+.fc.bad input{outline:2px dashed var(--form-bad);outline-offset:-2px}
 .errc{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}.errc .btn{margin-left:auto}
 .errd .sec{margin:var(--space-2) var(--space-4);overflow-wrap:anywhere}
 .vbd{position:sticky;top:calc(var(--st) + var(--tap) + var(--space-2));z-index:3;height:0;text-align:center}
